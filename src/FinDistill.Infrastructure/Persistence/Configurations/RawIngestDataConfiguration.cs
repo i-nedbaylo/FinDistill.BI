@@ -11,7 +11,7 @@ public class RawIngestDataConfiguration : IEntityTypeConfiguration<RawIngestData
         builder.ToTable("RawIngestData", "lake");
 
         builder.HasKey(e => e.Id);
-        builder.Property(e => e.Id).UseIdentityColumn();
+        builder.Property(e => e.Id).ValueGeneratedOnAdd();
 
         builder.Property(e => e.Source).HasMaxLength(50).IsRequired();
         builder.Property(e => e.Endpoint).HasMaxLength(256).IsRequired();

@@ -11,7 +11,7 @@ public class DimAssetConfiguration : IEntityTypeConfiguration<DimAsset>
         builder.ToTable("DimAssets", "dwh");
 
         builder.HasKey(e => e.AssetKey);
-        builder.Property(e => e.AssetKey).UseIdentityColumn();
+        builder.Property(e => e.AssetKey).ValueGeneratedOnAdd();
 
         builder.Property(e => e.Ticker).HasMaxLength(20).IsRequired();
         builder.Property(e => e.Name).HasMaxLength(200).IsRequired();

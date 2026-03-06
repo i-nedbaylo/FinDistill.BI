@@ -11,7 +11,7 @@ public class DimSourceConfiguration : IEntityTypeConfiguration<DimSource>
         builder.ToTable("DimSources", "dwh");
 
         builder.HasKey(e => e.SourceKey);
-        builder.Property(e => e.SourceKey).UseIdentityColumn();
+        builder.Property(e => e.SourceKey).ValueGeneratedOnAdd();
 
         builder.Property(e => e.SourceName).HasMaxLength(50).IsRequired();
         builder.Property(e => e.BaseUrl).HasMaxLength(256).IsRequired();
