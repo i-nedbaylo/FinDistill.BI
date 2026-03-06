@@ -38,32 +38,33 @@
 
 ## Фаза 1. Domain Layer (FinDistill.Domain)
 
-- [ ] **1.1** Создать Enums:
+- [✅] **1.1** Создать Enums:
   - `Enums/AssetType.cs` — Stock, ETF, Crypto
   - `Enums/DataSourceType.cs` — YahooFinance, CoinGecko
-- [ ] **1.2** Создать Entities (Data Lake):
+- [✅] **1.2** Создать Entities (Data Lake):
   - `Entities/RawIngestData.cs` — Id, Source, Endpoint, RawContent, LoadedAt, IsProcessed
-- [ ] **1.3** Создать Entities (DWH — Dimensions):
+- [✅] **1.3** Создать Entities (DWH — Dimensions):
   - `Entities/DimAsset.cs` — AssetKey, Ticker, Name, AssetType, Exchange, IsActive, CreatedAt, UpdatedAt
   - `Entities/DimDate.cs` — DateKey, FullDate, Year, Quarter, Month, Day, DayOfWeek, WeekOfYear, IsWeekend
   - `Entities/DimSource.cs` — SourceKey, SourceName, BaseUrl, IsActive
-- [ ] **1.4** Создать Entities (DWH — Facts):
+- [✅] **1.4** Создать Entities (DWH — Facts):
   - `Entities/FactQuote.cs` — Id, AssetKey, DateKey, SourceKey, OpenPrice, HighPrice, LowPrice, ClosePrice, Volume, LoadedAt + навигационные свойства
-- [ ] **1.5** Создать интерфейсы репозиториев:
+- [✅] **1.5** Создать интерфейсы репозиториев:
   - `Interfaces/IRawIngestDataRepository.cs` — AddAsync, GetUnprocessedAsync, MarkAsProcessedAsync
   - `Interfaces/IDimAssetRepository.cs` — GetByTickerAsync, UpsertAsync, GetAllActiveAsync
   - `Interfaces/IDimDateRepository.cs` — EnsureDateExistsAsync, GetByDateAsync
   - `Interfaces/IDimSourceRepository.cs` — GetByNameAsync, UpsertAsync
   - `Interfaces/IFactQuoteRepository.cs` — AddRangeAsync, ExistsAsync (по AssetKey+DateKey+SourceKey)
-- [ ] **1.6** Создать интерфейс IMarketDataProvider (Strategy):
+- [✅] **1.6** Создать интерфейс IMarketDataProvider (Strategy):
   - `Interfaces/IMarketDataProvider.cs` — SourceType, FetchRawDataAsync, FetchBulkDataAsync
-- [ ] **1.7** Создать интерфейс IDataMartReader (Dapper/ClickHouse-чтение):
+- [✅] **1.7** Создать интерфейс IDataMartReader (Dapper/ClickHouse-чтение):
   - `Interfaces/IDataMartReader.cs` — GetDailyPerformanceAsync, GetAssetHistoryAsync, GetPortfolioSummaryAsync
+  - `Models/DailyPerformanceRecord.cs`, `Models/AssetHistoryRecord.cs`, `Models/PortfolioSummaryRecord.cs` — read models для Data Marts
   - ⚡ Ключевая точка расширения: реализация переключается между Dapper и ClickHouse через конфигурацию
-- [ ] **1.8** Создать интерфейс ICacheService (точка расширения для Redis):
+- [✅] **1.8** Создать интерфейс ICacheService (точка расширения для Redis):
   - `Interfaces/ICacheService.cs` — GetAsync<T>, SetAsync<T>, RemoveAsync
   - ⚡ Создаётся сразу, реализация — в Фазе 10 (NullCacheService + RedisCacheService)
-- [ ] **1.9** Собрать проект, убедиться что нет ошибок
+- [✅] **1.9** Собрать проект, убедиться что нет ошибок
 
 ---
 
