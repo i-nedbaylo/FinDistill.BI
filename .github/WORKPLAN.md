@@ -290,6 +290,28 @@
 
 ---
 
+## Фаза 9.5. Аудит и критические исправления
+
+> Исправления выявленные при комплексном аудите кода (post Phase 9).
+
+- [ ] **9.5.1** 🔴 Исправить `ExtractorService`: передавать тикеры из `DataSources` конфигурации
+  - Создать `Configuration/DataSourcesOptions.cs` в Infrastructure
+  - Внедрить `IOptions<DataSourcesOptions>` в `ExtractorService`
+  - Передавать тикеры в `FetchBulkDataAsync` по `SourceType`
+- [ ] **9.5.2** 🟡 Исправить `LoaderService`: `AssetType = "YahooFinance"` → реальный тип (Stock/ETF/Crypto)
+  - Определять тип актива по `DataSourceType`: CoinGecko → Crypto, YahooFinance → Stock (по умолчанию)
+- [ ] **9.5.3** 🟡 Оптимизировать `LoaderService`: устранить N+1 запросы
+  - Кэшировать dimension lookups в памяти внутри одного вызова `LoadAsync`
+  - Один `SaveChangesAsync` для batch фактов
+  - Обернуть в транзакцию
+- [ ] **9.5.4** 🟡 Вынести retry-логику в `RetryDelegatingHandler`
+  - Создать `Infrastructure/Http/RetryDelegatingHandler.cs`
+  - Зарегистрировать через `AddHttpMessageHandler` в DI
+  - Убрать дублированный retry-код из обоих провайдеров
+- [ ] **9.5.5** Собрать проект, убедиться что нет ошибок
+
+---
+
 ## Фаза 10. Redis-кэширование (опциональная)
 
 > Реализуется только после базового функционала (Фазы 0–9). Интерфейс `ICacheService` уже заложен в Фазе 1.
