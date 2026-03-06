@@ -29,7 +29,8 @@ public class CoinGeckoProvider : IMarketDataProvider
 
     public async Task<string> FetchRawDataAsync(string coinId, CancellationToken ct)
     {
-        var url = $"{BaseUrl}/coins/{coinId}/market_chart?vs_currency=usd&days=5&interval=daily";
+        var encodedCoinId = Uri.EscapeDataString(coinId);
+        var url = $"{BaseUrl}/coins/{encodedCoinId}/market_chart?vs_currency=usd&days=5&interval=daily";
 
         for (var attempt = 0; attempt < MaxRetries + 1; attempt++)
         {
