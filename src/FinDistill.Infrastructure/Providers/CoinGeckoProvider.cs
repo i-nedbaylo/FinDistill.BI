@@ -31,7 +31,7 @@ public class CoinGeckoProvider : IMarketDataProvider
     {
         var url = $"{BaseUrl}/coins/{coinId}/market_chart?vs_currency=usd&days=5&interval=daily";
 
-        for (var attempt = 0; attempt <= MaxRetries; attempt++)
+        for (var attempt = 0; attempt < MaxRetries + 1; attempt++)
         {
             try
             {
@@ -39,11 +39,15 @@ public class CoinGeckoProvider : IMarketDataProvider
 
                 if (response.StatusCode == HttpStatusCode.TooManyRequests)
                 {
-                    var delay = TimeSpan.FromSeconds(Math.Pow(2, attempt + 1));
-                    _logger.LogWarning("CoinGecko rate limited for {CoinId}, retrying in {Delay}s (attempt {Attempt}/{MaxRetries})",
-                        coinId, delay.TotalSeconds, attempt + 1, MaxRetries);
-                    await Task.Delay(delay, ct);
-                    continue;
+                    if (attempt < MaxRetries)
+                    {
+                        var delay = TimeSpan.FromSeconds(Math.Pow(2, attempt + 1));
+                        _logger.LogWarning("CoinGecko rate limited for {CoinId}, retrying in {Delay}s (attempt {Attempt}/{MaxRetries})",
+                            coinId, delay.TotalSeconds, attempt + 1, MaxRetries);
+                        await Task.Delay(delay, ct);
+                        continue;
+                    }
+                    break;
                 }
 
                 response.EnsureSuccessStatusCode();

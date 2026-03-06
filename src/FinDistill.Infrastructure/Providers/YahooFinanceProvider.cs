@@ -31,7 +31,7 @@ public class YahooFinanceProvider : IMarketDataProvider
     {
         var url = $"{BaseUrl}/{ticker}?range=5d&interval=1d";
 
-        for (var attempt = 0; attempt <= MaxRetries; attempt++)
+        for (var attempt = 0; attempt < MaxRetries + 1; attempt++)
         {
             try
             {
@@ -39,11 +39,15 @@ public class YahooFinanceProvider : IMarketDataProvider
 
                 if (response.StatusCode == HttpStatusCode.TooManyRequests)
                 {
-                    var delay = TimeSpan.FromSeconds(Math.Pow(2, attempt + 1));
-                    _logger.LogWarning("Yahoo Finance rate limited for {Ticker}, retrying in {Delay}s (attempt {Attempt}/{MaxRetries})",
-                        ticker, delay.TotalSeconds, attempt + 1, MaxRetries);
-                    await Task.Delay(delay, ct);
-                    continue;
+                    if (attempt < MaxRetries)
+                    {
+                        var delay = TimeSpan.FromSeconds(Math.Pow(2, attempt + 1));
+                        _logger.LogWarning("Yahoo Finance rate limited for {Ticker}, retrying in {Delay}s (attempt {Attempt}/{MaxRetries})",
+                            ticker, delay.TotalSeconds, attempt + 1, MaxRetries);
+                        await Task.Delay(delay, ct);
+                        continue;
+                    }
+                    break;
                 }
 
                 response.EnsureSuccessStatusCode();
