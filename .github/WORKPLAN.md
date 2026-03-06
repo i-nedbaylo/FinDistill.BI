@@ -196,26 +196,29 @@
 
 ## Фаза 7. Worker Service (FinDistill.Worker)
 
-- [ ] **7.1** Добавить NuGet-пакеты: Serilog.Extensions.Hosting, Serilog.Sinks.File, Serilog.Sinks.Console, Microsoft.Extensions.Hosting.WindowsServices
-- [ ] **7.2** Настроить `Program.cs`:
-  - Serilog
+- [✅] **7.1** Добавить NuGet-пакеты:
+  - Serilog.Extensions.Hosting 8.0.0
+  - Serilog.Sinks.Console 5.0.0
+  - Serilog.Sinks.File 5.0.0
+  - Serilog.Settings.Configuration 8.0.4
+  - Microsoft.Extensions.Hosting.WindowsServices 8.0.1
+- [✅] **7.2** Настроить `Program.cs`:
+  - Serilog bootstrap + AddSerilog (Console + File, rolling daily)
   - `builder.Services.AddInfrastructure(configuration)`
   - `builder.Services.AddApplicationServices()`
   - `builder.Services.AddHostedService<EtlWorker>()`
-  - Выбор режима хостинга по настройке `HostingMode`:
-    - `"Console"` → стандартный запуск (по умолчанию)
-    - `"WindowsService"` → `UseWindowsService()`
-    - `"Docker"` → стандартный запуск (без специального кода, но конфигурация через переменные окружения)
-- [ ] **7.3** Настроить `appsettings.json`:
-  - ConnectionStrings:DefaultConnection
-  - **DatabaseProvider: "SqlServer" | "PostgreSQL"** ← ключевая настройка
-  - EtlSchedule (IntervalMinutes / CronExpression)
-  - DataSources, HostingMode ("Console" | "WindowsService" | "Docker"), Serilog
-- [ ] **7.4** Создать `EtlWorker.cs : BackgroundService`:
-  - Читает расписание из IOptions<EtlScheduleOptions>
-  - В цикле вызывает IEtlOrchestrator.RunEtlPipelineAsync
-  - Логирует через Serilog
-- [ ] **7.5** Собрать проект, убедиться что нет ошибок
+  - Выбор режима хостинга по `HostingMode`: Console (default) / WindowsService / Docker
+- [✅] **7.3** Настроить `appsettings.json`:
+  - ConnectionStrings:DefaultConnection, Database:Provider
+  - EtlSchedule (IntervalMinutes=15, CronExpression=null)
+  - DataSources, HostingMode, Serilog
+- [✅] **7.4** Создать `EtlWorker.cs : BackgroundService`:
+  - IServiceScopeFactory для scoped IEtlOrchestrator
+  - IOptions<EtlScheduleOptions> для расписания
+  - Graceful shutdown через CancellationToken
+  - Structured logging через Serilog
+- [✅] **7.5** Создать `Configuration/EtlScheduleOptions.cs`
+- [✅] **7.6** Собрать проект, убедиться что нет ошибок
 
 ---
 
