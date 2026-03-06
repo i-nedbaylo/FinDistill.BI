@@ -315,7 +315,9 @@ Log.Information("ETL Extract started for {Source}, tickers count: {Count}", sour
     "ClickHouse": null,                  // Опционально: строка подключения к ClickHouse
     "Redis": null                        // Опционально: строка подключения к Redis
   },
-  "DatabaseProvider": "SqlServer",       // "SqlServer" | "PostgreSQL"
+  "Database": {
+    "Provider": "SqlServer"              // "SqlServer" | "PostgreSQL" — Options Pattern (IOptions<DatabaseOptions>)
+  },
   "EtlSchedule": {
     "IntervalMinutes": 15,               // Интервал запуска ETL в Worker
     "CronExpression": null               // Альтернатива: CRON-выражение

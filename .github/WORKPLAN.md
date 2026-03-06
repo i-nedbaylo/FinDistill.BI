@@ -277,12 +277,16 @@
 
 ## Фаза 9. Финальная сборка и проверка
 
-- [ ] **9.1** `dotnet build` всего solution — 0 errors
-- [ ] **9.2** Проверить, что переключение `DatabaseProvider` между `"SqlServer"` и `"PostgreSQL"` в appsettings корректно меняет провайдер EF Core и Dapper-подключение
-- [ ] **9.3** Проверить, что `ICacheService` инжектится как `NullCacheService` при `Features:UseRedis = false`
-- [ ] **9.4** Проверить, что `IDataMartReader` инжектится как `DapperDataMartReader` при `Features:UseClickHouse = false`
-- [ ] **9.5** Обновить `.github/copilot-instructions.md` — добавить секцию про настройку DatabaseProvider
-- [ ] **9.6** Обновить данный WORKPLAN — пометить все шаги как выполненные
+- [✅] **9.1** `dotnet build` всего solution — 0 errors
+- [✅] **9.2** Проверить, что переключение `Database:Provider` между `"SqlServer"` и `"PostgreSQL"` в appsettings корректно меняет провайдер EF Core и Dapper-подключение:
+  - `InfrastructureServiceExtensions.AddInfrastructure` — switch по `dbOptions.Provider`
+  - `DapperConnectionFactory.CreateConnection` — switch по `_provider`
+  - `DapperDataMartReader` — `_isPostgreSql` для SQL-диалекта
+- [✅] **9.3** Проверить, что `ICacheService` инжектится как `NullCacheService` при `Features:UseRedis = false`
+- [✅] **9.4** Проверить, что `IDataMartReader` инжектится как `DapperDataMartReader` при `Features:UseClickHouse = false`
+- [✅] **9.5** Обновить `.github/copilot-instructions.md`:
+  - Секция конфигурации: `"DatabaseProvider": "SqlServer"` → `"Database": { "Provider": "SqlServer" }`
+- [✅] **9.6** Обновить данный WORKPLAN — пометить все шаги как выполненные
 
 ---
 
