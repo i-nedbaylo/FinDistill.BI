@@ -29,7 +29,8 @@ public class YahooFinanceProvider : IMarketDataProvider
 
     public async Task<string> FetchRawDataAsync(string ticker, CancellationToken ct)
     {
-        var url = $"{BaseUrl}/{ticker}?range=5d&interval=1d";
+        var encodedTicker = Uri.EscapeDataString(ticker);
+        var url = $"{BaseUrl}/{encodedTicker}?range=5d&interval=1d";
 
         for (var attempt = 0; attempt < MaxRetries + 1; attempt++)
         {
