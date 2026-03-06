@@ -167,29 +167,30 @@
 
 ## Фаза 6. Presentation Layer (FinDistill.Web)
 
-- [ ] **6.1** Добавить NuGet-пакеты: Serilog.AspNetCore, Serilog.Sinks.File, Serilog.Sinks.Console
-- [ ] **6.2** Настроить `Program.cs`:
-  - Serilog (Console + File sinks)
+- [✅] **6.1** Добавить NuGet-пакеты: Serilog.AspNetCore 8.0.3 (включает Console + File sinks)
+- [✅] **6.2** Настроить `Program.cs`:
+  - Serilog bootstrap + Host.UseSerilog (Console + File sinks, rolling daily)
   - `builder.Services.AddInfrastructure(configuration)`
   - `builder.Services.AddApplicationServices()`
   - MVC (`AddControllersWithViews`)
-- [ ] **6.3** Настроить `appsettings.json`:
+  - Default route → Dashboard/Index
+- [✅] **6.3** Настроить `appsettings.json`:
   - ConnectionStrings:DefaultConnection
-  - **DatabaseProvider: "SqlServer" | "PostgreSQL"** ← ключевая настройка
-  - EtlSchedule, DataSources, Serilog секции
-- [ ] **6.4** Создать ViewModels:
-  - `ViewModels/DashboardViewModel.cs`
-  - `ViewModels/AssetDetailViewModel.cs`
-- [ ] **6.5** Создать Controllers:
+  - Database:Provider (Options Pattern)
+  - Features, DataSources, Serilog секции
+- [✅] **6.4** Создать ViewModels:
+  - `ViewModels/DashboardViewModel.cs` — DailyPerformance + PortfolioSummary
+  - `ViewModels/AssetDetailViewModel.cs` — Ticker, Name, AssetType, LastClose, ChangePercent, History
+- [✅] **6.5** Создать Controllers:
   - `Controllers/DashboardController.cs` — Index (дашборд со списком активов)
   - `Controllers/AssetController.cs` — Detail (история и график актива)
   - `Controllers/SyncController.cs` — RunSync (POST, ручной запуск ETL)
-- [ ] **6.6** Создать Views (Razor):
-  - `Views/Dashboard/Index.cshtml`
-  - `Views/Asset/Detail.cshtml`
-  - `Views/Shared/_Layout.cshtml`
-- [ ] **6.7** Добавить Chart.js в `wwwroot/lib/` и JS для графиков
-- [ ] **6.8** Собрать проект, убедиться что нет ошибок
+- [✅] **6.6** Создать Views (Razor):
+  - `Views/Dashboard/Index.cshtml` — таблица с портфелем, кнопка Chart
+  - `Views/Asset/Detail.cshtml` — Chart.js график + OHLCV таблица
+  - `Views/Shared/_Layout.cshtml` — dark nav, Sync Now кнопка
+- [✅] **6.7** Chart.js подключен через CDN (chart.js@4) в Asset/Detail.cshtml
+- [✅] **6.8** Собрать проект, убедиться что нет ошибок
 
 ---
 

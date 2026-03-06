@@ -1,0 +1,59 @@
+@model FinDistill.Web.ViewModels.DashboardViewModel
+@{
+    ViewData["Title"] = "Dashboard";
+}
+
+<h2 class="mb-4">Market Dashboard</h2>
+
+@if (TempData["SyncMessage"] is string syncMessage)
+{
+    var alertClass = TempData["SyncStatus"] as string ?? "info";
+    <div class="alert alert-@alertClass alert-dismissible fade show" role="alert">
+        @syncMessage
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+@if (Model.PortfolioSummary.Count == 0)
+{
+    <div class="alert alert-info">
+        No data available yet. Click <strong>Sync Now</strong> to fetch market data.
+    </div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped table-hover">
+            <thead class="table-dark">
+                <tr>
+                    <th>Ticker</th>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th class="text-end">Last Close</th>
+                    <th class="text-end">Previous Close</th>
+                    <th class="text-end">Change %</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Model.PortfolioSummary)
+                {
+                    var changeClass = item.ChangePercent >= 0 ? "text-success" : "text-danger";
+                    var changeSign = item.ChangePercent >= 0 ? "+" : "";
+                    <tr>
+                        <td><strong>@item.Ticker</strong></td>
+                        <td>@item.Name</td>
+                        <td><span class="badge bg-secondary">@item.AssetType</span></td>
+                        <td class="text-end">@item.LastClose.ToString("N2")</td>
+                        <td class="text-end">@item.PreviousClose.ToString("N2")</td>
+                        <td class="text-end @changeClass">@changeSign@item.ChangePercent.ToString("N2")%</td>
+                        <td>
+                            <a asp-controller="Asset" asp-action="Detail" asp-route-ticker="@item.Ticker"
+                               class="btn btn-sm btn-outline-primary">Chart</a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
