@@ -140,29 +140,28 @@
 
 ## Фаза 5. Infrastructure Layer — Часть 3: DI-регистрация и мульти-СУБД
 
-- [ ] **5.1** Создать extension-метод `DependencyInjection/InfrastructureServiceExtensions.cs`:
+- [✅] **5.1** Создать extension-метод `DependencyInjection/InfrastructureServiceExtensions.cs`:
   - `AddInfrastructure(IServiceCollection, IConfiguration)`:
-    - Читает `DatabaseOptions` из конфигурации (Options Pattern)
-    - Читает `FeaturesOptions` (UseRedis, UseClickHouse) из конфигурации
+    - Читает `DatabaseOptions` из конфигурации (Options Pattern) — секция `"Database"`
+    - Читает `FeaturesOptions` (UseRedis, UseClickHouse) из конфигурации — секция `"Features"`
     - Регистрирует `FinDistillDbContext` с выбором провайдера:
       - `"SqlServer"` → `UseSqlServer(connectionString)`
       - `"PostgreSQL"` → `UseNpgsql(connectionString)`
       - Иначе → бросить `InvalidOperationException` с понятным сообщением
     - Регистрирует `DapperConnectionFactory` как Singleton
     - Регистрирует все репозитории (Scoped)
-    - Регистрирует `IDataMartReader`:
-      - По умолчанию → `DapperDataMartReader`
-      - Если `Features:UseClickHouse = true` → `ClickHouseDataMartReader` (только после Фазы 11)
-    - Регистрирует `ICacheService`:
-      - По умолчанию → `NullCacheService`
-      - Если `Features:UseRedis = true` → `RedisCacheService` (только после Фазы 10)
-    - Регистрирует API-провайдеры как `IMarketDataProvider` (все реализации)
-- [ ] **5.2** Создать `NullCacheService.cs` — no-op реализация ICacheService (заглушка, всегда возвращает null):
+    - Регистрирует `IDataMartReader` → `DapperDataMartReader` (ClickHouse — Фаза 11)
+    - Регистрирует `ICacheService` → `NullCacheService` (Redis — Фаза 10)
+    - Регистрирует API-провайдеры как `IMarketDataProvider` через `AddHttpClient<T>()`
+  - Добавлен `Configuration/FeaturesOptions.cs`
+  - Добавлен пакет `Microsoft.Extensions.Http` для `AddHttpClient`
+- [✅] **5.2** Создать `NullCacheService.cs` — no-op реализация ICacheService (заглушка, всегда возвращает null):
   - Размещение: `Infrastructure/Caching/NullCacheService.cs`
   - Позволяет DashboardService работать прозрачно без Redis
-- [ ] **5.3** Создать extension-метод `DependencyInjection/ApplicationServiceExtensions.cs`:
-  - Регистрирует ETL-сервисы и DashboardService
-- [ ] **5.4** Собрать проект, убедиться что нет ошибок
+- [✅] **5.3** Создать extension-метод `DependencyInjection/ApplicationServiceExtensions.cs`:
+  - Регистрирует ETL-сервисы и DashboardService (Scoped)
+  - Добавлен пакет `Microsoft.Extensions.DependencyInjection.Abstractions` в Application
+- [✅] **5.4** Собрать проект, убедиться что нет ошибок
 
 ---
 
