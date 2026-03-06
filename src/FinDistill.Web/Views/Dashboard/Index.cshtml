@@ -5,6 +5,15 @@
 
 <h2 class="mb-4">Market Dashboard</h2>
 
+@if (TempData["SyncMessage"] is string syncMessage)
+{
+    var alertClass = TempData["SyncStatus"] as string ?? "info";
+    <div class="alert alert-@alertClass alert-dismissible fade show" role="alert">
+        @syncMessage
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
 @if (Model.PortfolioSummary.Count == 0)
 {
     <div class="alert alert-info">
