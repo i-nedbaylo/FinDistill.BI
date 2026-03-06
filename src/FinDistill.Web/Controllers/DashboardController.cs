@@ -15,12 +15,10 @@ public class DashboardController : Controller
 
     public async Task<IActionResult> Index(CancellationToken ct)
     {
-        var daily = await _dashboardService.GetDailyPerformanceAsync(ct);
         var portfolio = await _dashboardService.GetPortfolioSummaryAsync(ct);
 
         var viewModel = new DashboardViewModel
         {
-            DailyPerformance = daily,
             PortfolioSummary = portfolio
         };
 
