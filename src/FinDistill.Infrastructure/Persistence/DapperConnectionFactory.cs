@@ -20,7 +20,11 @@ public class DapperConnectionFactory
     {
         _connectionString = configuration.GetConnectionString("DefaultConnection")
             ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection is not configured.");
-        _provider = options.Value.Provider;
+
+        _provider = options.Value.Provider is { Length: > 0 } p
+            ? p
+            : throw new InvalidOperationException(
+                "Database provider is not configured. Set 'Database:Provider' to 'SqlServer' or 'PostgreSQL'.");
     }
 
     public IDbConnection CreateConnection()
