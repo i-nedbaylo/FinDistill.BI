@@ -241,7 +241,7 @@
   - Сервис `db-postgres` — профиль `postgres` (postgres:16)
   - Сервис `redis` — профиль `redis` (redis:7-alpine), опциональный
   - Сервис `clickhouse` — профиль `clickhouse` (clickhouse/clickhouse-server:latest), опциональный
-  - Переменные окружения: `ConnectionStrings__DefaultConnection`, `DatabaseProvider`, `Features__UseRedis`, `Features__UseClickHouse`, `HostingMode=Docker`
+  - Переменные окружения: `ConnectionStrings__DefaultConnection`, `Database__Provider`, `Features__UseRedis`, `Features__UseClickHouse`, `HostingMode=Docker`
   - Volumes для персистентного хранения БД
   - depends_on: web → db, worker → db
 - [ ] **7.5.4** Создать `docker-compose.override.yml` с development-настройками:
@@ -277,12 +277,16 @@
 
 ## Фаза 9. Финальная сборка и проверка
 
-- [ ] **9.1** `dotnet build` всего solution — 0 errors
-- [ ] **9.2** Проверить, что переключение `DatabaseProvider` между `"SqlServer"` и `"PostgreSQL"` в appsettings корректно меняет провайдер EF Core и Dapper-подключение
-- [ ] **9.3** Проверить, что `ICacheService` инжектится как `NullCacheService` при `Features:UseRedis = false`
-- [ ] **9.4** Проверить, что `IDataMartReader` инжектится как `DapperDataMartReader` при `Features:UseClickHouse = false`
-- [ ] **9.5** Обновить `.github/copilot-instructions.md` — добавить секцию про настройку DatabaseProvider
-- [ ] **9.6** Обновить данный WORKPLAN — пометить все шаги как выполненные
+- [✅] **9.1** `dotnet build` всего solution — 0 errors
+- [✅] **9.2** Проверить, что переключение `Database:Provider` между `"SqlServer"` и `"PostgreSQL"` в appsettings корректно меняет провайдер EF Core и Dapper-подключение:
+  - `InfrastructureServiceExtensions.AddInfrastructure` — switch по `dbOptions.Provider`
+  - `DapperConnectionFactory.CreateConnection` — switch по `_provider`
+  - `DapperDataMartReader` — `_isPostgreSql` для SQL-диалекта
+- [✅] **9.3** Проверить, что `ICacheService` инжектится как `NullCacheService` при `Features:UseRedis = false`
+- [✅] **9.4** Проверить, что `IDataMartReader` инжектится как `DapperDataMartReader` при `Features:UseClickHouse = false`
+- [✅] **9.5** Обновить `.github/copilot-instructions.md`:
+  - Секция конфигурации: `"DatabaseProvider": "SqlServer"` → `"Database": { "Provider": "SqlServer" }`
+- [✅] **9.6** Обновить данный WORKPLAN — пометить все шаги как выполненные
 
 ---
 
@@ -312,7 +316,7 @@
 - [ ] **11.2** Создать класс настроек `Configuration/ClickHouseOptions.cs`:
   - ConnectionString (из ConnectionStrings:ClickHouse)
 - [ ] **11.3** Реализовать `DataMarts/ClickHouseDataMartReader.cs : IDataMartReader`:
-  - SQL-запросы адаптированные под ClickHouse SQL-диалект
+  - SQL-запросы адаптированные под ClickHouse SQL-диалекта
   - Параметризованные запросы
 - [ ] **11.4** Создать `ClickHouseSyncService` — ETL-этап синхронизации DWH → ClickHouse:
   - Batch insert из dwh.FactQuotes + Dimensions в таблицы ClickHouse

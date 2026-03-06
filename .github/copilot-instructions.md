@@ -128,7 +128,7 @@ FinDistill.BI.sln
   - По умолчанию: консольное приложение.
   - Опционально (через настройку): Windows Service (`UseWindowsService()`) или Docker-контейнер.
   - Выбор режима хостинга через `appsettings.json` → `"HostingMode": "Console" | "WindowsService" | "Docker"`.
-  - В режиме `"Docker"` конфигурация передаётся через переменные окружения (ASP.NET Core convention: `ConnectionStrings__DefaultConnection`, `DatabaseProvider` и т.д.).
+  - В режиме `"Docker"` конфигурация передаётся через переменные окружения (ASP.NET Core convention: `ConnectionStrings__DefaultConnection`, `Database__Provider` и т.д.).
 
 **Правила:**
 - Это **отдельное приложение**, а не библиотека — имеет собственный `Program.cs` и `appsettings.json`.
@@ -315,7 +315,9 @@ Log.Information("ETL Extract started for {Source}, tickers count: {Count}", sour
     "ClickHouse": null,                  // Опционально: строка подключения к ClickHouse
     "Redis": null                        // Опционально: строка подключения к Redis
   },
-  "DatabaseProvider": "SqlServer",       // "SqlServer" | "PostgreSQL"
+  "Database": {
+    "Provider": "SqlServer"              // "SqlServer" | "PostgreSQL" — Options Pattern (IOptions<DatabaseOptions>)
+  },
   "EtlSchedule": {
     "IntervalMinutes": 15,               // Интервал запуска ETL в Worker
     "CronExpression": null               // Альтернатива: CRON-выражение
@@ -460,7 +462,7 @@ else
 **Правила:**
 - ClickHouse используется **только для чтения** Data Marts.
 - Запись OLTP-данных (Lake, DWH) **всегда** через EF Core в SQL Server / PostgreSQL.
-- Application-слой не знает о ClickHouse — только интерфейс `IDataMartReader`.
+- Application-слоем не знает о ClickHouse — только интерфейс `IDataMartReader`.
 
 ### 10.3 Docker — контейнеризация
 
@@ -470,7 +472,7 @@ else
 
 1. **Конфигурация через переменные окружения:**
    - Все настройки из `appsettings.json` переопределяются через env vars.
-   - ASP.NET Core convention: `ConnectionStrings__DefaultConnection`, `DatabaseProvider`, `Features__UseRedis`.
+   - ASP.NET Core convention: `ConnectionStrings__DefaultConnection`, `Database__Provider`, `Features__UseRedis`.
 
 2. **Health Checks (готовность):**
    - Web: health check endpoint (`/health`) для проверки подключения к БД.
