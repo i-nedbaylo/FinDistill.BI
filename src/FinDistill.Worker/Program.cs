@@ -21,7 +21,7 @@ try
 
     // Hosting mode
     var hostingMode = builder.Configuration["HostingMode"] ?? "Console";
-    if (hostingMode == "WindowsService")
+    if (string.Equals(hostingMode, "WindowsService", StringComparison.OrdinalIgnoreCase))
     {
         builder.Services.AddWindowsService(options =>
         {
