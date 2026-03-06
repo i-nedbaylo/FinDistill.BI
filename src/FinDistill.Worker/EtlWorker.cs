@@ -26,9 +26,18 @@ public class EtlWorker : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var interval = TimeSpan.FromMinutes(_schedule.IntervalMinutes);
+        var intervalMinutes = _schedule.IntervalMinutes;
+        if (intervalMinutes < 1)
+        {
+            _logger.LogWarning(
+                "Invalid ETL interval {ConfiguredInterval} minutes configured. Using minimum interval of 1 minute",
+                intervalMinutes);
+            intervalMinutes = 1;
+        }
 
-        _logger.LogInformation("ETL Worker started. Schedule interval: {IntervalMinutes} minutes", _schedule.IntervalMinutes);
+        var interval = TimeSpan.FromMinutes(intervalMinutes);
+
+        _logger.LogInformation("ETL Worker started. Schedule interval: {IntervalMinutes} minutes", intervalMinutes);
 
         while (!stoppingToken.IsCancellationRequested)
         {
