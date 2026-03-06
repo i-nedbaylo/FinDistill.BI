@@ -241,7 +241,7 @@
   - Сервис `db-postgres` — профиль `postgres` (postgres:16)
   - Сервис `redis` — профиль `redis` (redis:7-alpine), опциональный
   - Сервис `clickhouse` — профиль `clickhouse` (clickhouse/clickhouse-server:latest), опциональный
-  - Переменные окружения: `ConnectionStrings__DefaultConnection`, `DatabaseProvider`, `Features__UseRedis`, `Features__UseClickHouse`, `HostingMode=Docker`
+  - Переменные окружения: `ConnectionStrings__DefaultConnection`, `Database__Provider`, `Features__UseRedis`, `Features__UseClickHouse`, `HostingMode=Docker`
   - Volumes для персистентного хранения БД
   - depends_on: web → db, worker → db
 - [ ] **7.5.4** Создать `docker-compose.override.yml` с development-настройками:
@@ -316,7 +316,7 @@
 - [ ] **11.2** Создать класс настроек `Configuration/ClickHouseOptions.cs`:
   - ConnectionString (из ConnectionStrings:ClickHouse)
 - [ ] **11.3** Реализовать `DataMarts/ClickHouseDataMartReader.cs : IDataMartReader`:
-  - SQL-запросы адаптированные под ClickHouse SQL-диалект
+  - SQL-запросы адаптированные под ClickHouse SQL-диалекта
   - Параметризованные запросы
 - [ ] **11.4** Создать `ClickHouseSyncService` — ETL-этап синхронизации DWH → ClickHouse:
   - Batch insert из dwh.FactQuotes + Dimensions в таблицы ClickHouse
