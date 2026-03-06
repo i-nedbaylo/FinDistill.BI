@@ -70,26 +70,26 @@
 
 ## Фаза 2. Application Layer (FinDistill.Application)
 
-- [ ] **2.1** Создать DTO:
+- [✅] **2.1** Создать DTO:
   - `DTOs/ParsedQuoteDto.cs` — Ticker, Date, Open, High, Low, Close, Volume, SourceType
   - `DTOs/DailyPerformanceDto.cs` — Ticker, Name, AssetType, ClosePrice, ChangePercent
   - `DTOs/AssetHistoryDto.cs` — Date, Open, High, Low, Close, Volume
   - `DTOs/PortfolioSummaryDto.cs` — Ticker, Name, AssetType, LastClose, PreviousClose, ChangePercent
-- [ ] **2.2** Создать интерфейсы ETL-сервисов:
+- [✅] **2.2** Создать интерфейсы ETL-сервисов:
   - `Interfaces/IExtractorService.cs` — ExtractAsync(CancellationToken)
   - `Interfaces/ITransformerService.cs` — TransformAsync(CancellationToken)
   - `Interfaces/ILoaderService.cs` — LoadAsync(IEnumerable<ParsedQuoteDto>, CancellationToken)
   - `Interfaces/IEtlOrchestrator.cs` — RunEtlPipelineAsync(CancellationToken)
-- [ ] **2.3** Создать интерфейс IDashboardService:
+- [✅] **2.3** Создать интерфейс IDashboardService:
   - `Interfaces/IDashboardService.cs` — GetDailyPerformanceAsync, GetAssetHistoryAsync, GetPortfolioSummaryAsync
-- [ ] **2.4** Реализовать ETL-сервисы:
+- [✅] **2.4** Реализовать ETL-сервисы:
   - `Services/ExtractorService.cs` — использует IEnumerable<IMarketDataProvider> + IRawIngestDataRepository
   - `Services/TransformerService.cs` — читает Lake, парсит JSON, валидирует, возвращает ParsedQuoteDto
   - `Services/LoaderService.cs` — записывает в DWH через репозитории, помечает Lake как обработанный
   - `Services/EtlOrchestrator.cs` — оркестрирует E→T→L, ловит исключения, логирует
-- [ ] **2.5** Реализовать DashboardService:
-  - `Services/DashboardService.cs` — делегирует чтение в IDataMartReader
-- [ ] **2.6** Собрать проект, убедиться что нет ошибок
+- [✅] **2.5** Реализовать DashboardService:
+  - `Services/DashboardService.cs` — делегирует чтение в IDataMartReader, оборачивает ICacheService
+- [✅] **2.6** Собрать проект, убедиться что нет ошибок
 
 ---
 
