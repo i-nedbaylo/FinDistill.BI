@@ -130,6 +130,9 @@ public class YahooFinanceProvider : IMarketDataProvider
         if (!indicators.TryGetProperty(property, out var arr))
             return 0;
 
+        if (index < 0 || index >= arr.GetArrayLength())
+            return 0;
+
         var element = arr[index];
         return element.ValueKind == JsonValueKind.Null ? 0 : element.GetDecimal();
     }
