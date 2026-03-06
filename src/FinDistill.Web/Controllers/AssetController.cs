@@ -18,7 +18,9 @@ public class AssetController : Controller
         if (string.IsNullOrWhiteSpace(ticker))
             return BadRequest("Ticker is required.");
 
-        var history = await _dashboardService.GetAssetHistoryAsync(ticker, days, ct);
+        var clampedDays = Math.Clamp(days, 1, 365);
+
+        var history = await _dashboardService.GetAssetHistoryAsync(ticker, clampedDays, ct);
         var portfolio = await _dashboardService.GetPortfolioSummaryAsync(ct);
         var asset = portfolio.FirstOrDefault(p => p.Ticker == ticker);
 
