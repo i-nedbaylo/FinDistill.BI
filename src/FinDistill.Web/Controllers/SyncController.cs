@@ -13,6 +13,7 @@ public class SyncController : Controller
     }
 
     [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> RunSync(CancellationToken ct)
     {
         await _etlOrchestrator.RunEtlPipelineAsync(ct);
