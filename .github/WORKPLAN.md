@@ -122,19 +122,19 @@
 
 ## Фаза 4. Infrastructure Layer — Часть 2: Repositories & Providers
 
-- [ ] **4.1** Реализовать репозитории (EF Core, запись):
-  - `Repositories/RawIngestDataRepository.cs`
-  - `Repositories/DimAssetRepository.cs`
-  - `Repositories/DimDateRepository.cs`
-  - `Repositories/DimSourceRepository.cs`
-  - `Repositories/FactQuoteRepository.cs`
-- [ ] **4.2** Реализовать DapperDataMartReader (Dapper, чтение):
-  - `DataMarts/DapperDataMartReader.cs` — параметризованные SQL-запросы к mart-вьюшкам
-- [ ] **4.3** Создать API-клиенты:
-  - `Providers/YahooFinanceProvider.cs` — реализация IMarketDataProvider
-  - `Providers/CoinGeckoProvider.cs` — реализация IMarketDataProvider
-  - Обработка HTTP 429 с экспоненциальным backoff в обоих
-- [ ] **4.4** Собрать проект, убедиться что нет ошибок
+- [✅] **4.1** Реализовать репозитории (EF Core, запись):
+  - `Repositories/RawIngestDataRepository.cs` — AddAsync, GetUnprocessedAsync, MarkAsProcessedAsync (ExecuteUpdateAsync)
+  - `Repositories/DimAssetRepository.cs` — GetByTickerAsync, UpsertAsync, GetAllActiveAsync
+  - `Repositories/DimDateRepository.cs` — EnsureDateExistsAsync (auto-populates all fields), GetByDateAsync
+  - `Repositories/DimSourceRepository.cs` — GetByNameAsync, UpsertAsync
+  - `Repositories/FactQuoteRepository.cs` — AddRangeAsync, ExistsAsync
+- [✅] **4.2** Реализовать DapperDataMartReader (Dapper, чтение):
+  - `DataMarts/DapperDataMartReader.cs` — параметризованные SQL-запросы к mart-вьюшкам с CommandDefinition + CancellationToken
+- [✅] **4.3** Создать API-клиенты:
+  - `Providers/YahooFinanceProvider.cs` — реализация IMarketDataProvider, конвертация Yahoo JSON в стандартный формат
+  - `Providers/CoinGeckoProvider.cs` — реализация IMarketDataProvider, конвертация CoinGecko market_chart в стандартный формат
+  - Обработка HTTP 429 с экспоненциальным backoff в обоих (MaxRetries=3)
+- [✅] **4.4** Собрать проект, убедиться что нет ошибок
 
 ---
 
