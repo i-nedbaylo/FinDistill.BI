@@ -95,28 +95,28 @@
 
 ## Фаза 3. Infrastructure Layer — Часть 1: Database (FinDistill.Infrastructure)
 
-- [ ] **3.1** Добавить NuGet-пакеты:
-  - `Microsoft.EntityFrameworkCore`
-  - `Microsoft.EntityFrameworkCore.SqlServer`
-  - `Npgsql.EntityFrameworkCore.PostgreSQL`
-  - `Dapper`
-  - `Microsoft.Data.SqlClient` (для Dapper + SQL Server)
-  - `Npgsql` (для Dapper + PostgreSQL)
-- [ ] **3.2** Создать класс настроек `Configuration/DatabaseOptions.cs`:
+- [✅] **3.1** Добавить NuGet-пакеты:
+  - `Microsoft.EntityFrameworkCore` 8.0.16
+  - `Microsoft.EntityFrameworkCore.SqlServer` 8.0.16
+  - `Npgsql.EntityFrameworkCore.PostgreSQL` 8.0.11
+  - `Dapper` 2.1.66
+  - `Microsoft.Data.SqlClient` 5.2.2 (для Dapper + SQL Server)
+  - `Npgsql` 8.0.6 (для Dapper + PostgreSQL)
+- [✅] **3.2** Создать класс настроек `Configuration/DatabaseOptions.cs`:
   - `Provider` — "SqlServer" | "PostgreSQL"
   - (connection string берётся из ConnectionStrings:DefaultConnection)
-- [ ] **3.3** Создать `Persistence/FinDistillDbContext.cs`:
+- [✅] **3.3** Создать `Persistence/FinDistillDbContext.cs`:
   - DbSet для: RawIngestData, DimAsset, DimDate, DimSource, FactQuote
-  - OnModelCreating: конфигурация схем (lake, dwh), ключей, индексов, FK, UNIQUE constraint
-- [ ] **3.4** Создать Fluent-конфигурации EF Core (EntityTypeConfiguration):
-  - `Persistence/Configurations/RawIngestDataConfiguration.cs`
-  - `Persistence/Configurations/DimAssetConfiguration.cs`
-  - `Persistence/Configurations/DimDateConfiguration.cs`
-  - `Persistence/Configurations/DimSourceConfiguration.cs`
-  - `Persistence/Configurations/FactQuoteConfiguration.cs`
-- [ ] **3.5** Создать фабрику для Dapper-подключения:
+  - OnModelCreating: ApplyConfigurationsFromAssembly
+- [✅] **3.4** Создать Fluent-конфигурации EF Core (EntityTypeConfiguration):
+  - `Persistence/Configurations/RawIngestDataConfiguration.cs` — schema lake, filtered index
+  - `Persistence/Configurations/DimAssetConfiguration.cs` — schema dwh, unique Ticker
+  - `Persistence/Configurations/DimDateConfiguration.cs` — schema dwh, ValueGeneratedNever
+  - `Persistence/Configurations/DimSourceConfiguration.cs` — schema dwh, unique SourceName
+  - `Persistence/Configurations/FactQuoteConfiguration.cs` — schema dwh, UNIQUE(Asset,Date,Source), FK с Restrict
+- [✅] **3.5** Создать фабрику для Dapper-подключения:
   - `Persistence/DapperConnectionFactory.cs` — возвращает IDbConnection (SqlConnection или NpgsqlConnection) в зависимости от DatabaseOptions.Provider
-- [ ] **3.6** Собрать проект, убедиться что нет ошибок
+- [✅] **3.6** Собрать проект, убедиться что нет ошибок
 
 ---
 
