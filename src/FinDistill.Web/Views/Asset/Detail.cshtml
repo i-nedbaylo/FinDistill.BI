@@ -1,0 +1,96 @@
+@model FinDistill.Web.ViewModels.AssetDetailViewModel
+@{
+    ViewData["Title"] = $"{Model.Ticker} — Detail";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2>@Model.Ticker — @Model.Name</h2>
+        <span class="badge bg-secondary">@Model.AssetType</span>
+        @{
+            var changeClass = Model.ChangePercent >= 0 ? "text-success" : "text-danger";
+            var changeSign = Model.ChangePercent >= 0 ? "+" : "";
+        }
+        <span class="ms-2 fs-5">
+            <strong>@Model.LastClose.ToString("N2")</strong>
+            <span class="@changeClass">(@changeSign@Model.ChangePercent.ToString("N2")%)</span>
+        </span>
+    </div>
+    <a asp-controller="Dashboard" asp-action="Index" class="btn btn-outline-secondary">← Back</a>
+</div>
+
+@if (Model.History.Count == 0)
+{
+    <div class="alert alert-info">No historical data available for this asset.</div>
+}
+else
+{
+    <div class="card">
+        <div class="card-body">
+            <canvas id="priceChart" height="100"></canvas>
+        </div>
+    </div>
+
+    <div class="table-responsive mt-4">
+        <table class="table table-sm table-striped">
+            <thead class="table-dark">
+                <tr>
+                    <th>Date</th>
+                    <th class="text-end">Open</th>
+                    <th class="text-end">High</th>
+                    <th class="text-end">Low</th>
+                    <th class="text-end">Close</th>
+                    <th class="text-end">Volume</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var row in Model.History)
+                {
+                    <tr>
+                        <td>@row.Date.ToString("yyyy-MM-dd")</td>
+                        <td class="text-end">@row.Open.ToString("N2")</td>
+                        <td class="text-end">@row.High.ToString("N2")</td>
+                        <td class="text-end">@row.Low.ToString("N2")</td>
+                        <td class="text-end">@row.Close.ToString("N2")</td>
+                        <td class="text-end">@row.Volume.ToString("N0")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+    <script>
+        const labels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.History.Select(h => h.Date.ToString("yyyy-MM-dd"))));
+        const closes = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.History.Select(h => h.Close)));
+
+        const ctx = document.getElementById('priceChart');
+        if (ctx) {
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '@Model.Ticker Close Price',
+                        data: closes,
+                        borderColor: 'rgb(75, 192, 192)',
+                        backgroundColor: 'rgba(75, 192, 192, 0.1)',
+                        fill: true,
+                        tension: 0.3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { display: true }
+                    },
+                    scales: {
+                        y: { beginAtZero: false }
+                    }
+                }
+            });
+        }
+    </script>
+}
