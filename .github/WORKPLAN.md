@@ -256,10 +256,22 @@
 
 ## Фаза 8. Миграции EF Core
 
-- [ ] **8.1** Создать начальную миграцию для SQL Server
-- [ ] **8.2** Проверить, что миграция генерирует корректные схемы (lake, dwh)
-- [ ] **8.3** Создать SQL-скрипты для Data Mart Views (mart.v_DailyPerformance, mart.v_AssetHistory, mart.v_PortfolioSummary)
-- [ ] **8.4** Добавить миграцию для создания Views
+- [✅] **8.1** Создать начальную миграцию для SQL Server:
+  - Установлен dotnet-ef 8.0.16 как local tool
+  - Добавлен Microsoft.EntityFrameworkCore.Design 8.0.16 в Web
+  - Миграция `InitialCreate` — создаёт таблицы в схемах `lake` и `dwh`
+- [✅] **8.2** Проверить, что миграция генерирует корректные схемы (lake, dwh):
+  - `lake.RawIngestData` — IDENTITY, index on IsProcessed
+  - `dwh.DimAssets` — unique Ticker
+  - `dwh.DimDates` — ValueGeneratedNever, unique FullDate
+  - `dwh.DimSources` — unique SourceName
+  - `dwh.FactQuotes` — UNIQUE(Asset,Date,Source), FK Restrict
+- [✅] **8.3** Создать SQL-скрипты для Data Mart Views:
+  - `Scripts/DataMartViews_SqlServer.sql` — CROSS APPLY / OUTER APPLY
+  - `Scripts/DataMartViews_PostgreSQL.sql` — LATERAL JOIN
+- [✅] **8.4** Добавить миграцию для создания Views:
+  - Миграция `AddDataMartViews` — EnsureSchema mart + raw SQL для 3 views
+  - Down: DROP VIEW IF EXISTS
 
 ---
 
