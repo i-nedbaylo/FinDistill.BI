@@ -9,6 +9,8 @@ public interface IRawIngestDataRepository
 {
     Task AddAsync(RawIngestData record, CancellationToken ct);
 
+    Task AddRangeAsync(IEnumerable<RawIngestData> records, CancellationToken ct);
+
     Task<IReadOnlyList<RawIngestData>> GetUnprocessedAsync(CancellationToken ct);
 
     Task MarkAsProcessedAsync(IEnumerable<long> ids, CancellationToken ct);

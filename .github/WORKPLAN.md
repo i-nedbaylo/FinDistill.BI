@@ -294,21 +294,22 @@
 
 > Исправления выявленные при комплексном аудите кода (post Phase 9).
 
-- [ ] **9.5.1** 🔴 Исправить `ExtractorService`: передавать тикеры из `DataSources` конфигурации
-  - Создать `Configuration/DataSourcesOptions.cs` в Infrastructure
-  - Внедрить `IOptions<DataSourcesOptions>` в `ExtractorService`
-  - Передавать тикеры в `FetchBulkDataAsync` по `SourceType`
-- [ ] **9.5.2** 🟡 Исправить `LoaderService`: `AssetType = "YahooFinance"` → реальный тип (Stock/ETF/Crypto)
-  - Определять тип актива по `DataSourceType`: CoinGecko → Crypto, YahooFinance → Stock (по умолчанию)
-- [ ] **9.5.3** 🟡 Оптимизировать `LoaderService`: устранить N+1 запросы
-  - Кэшировать dimension lookups в памяти внутри одного вызова `LoadAsync`
-  - Один `SaveChangesAsync` для batch фактов
-  - Обернуть в транзакцию
-- [ ] **9.5.4** 🟡 Вынести retry-логику в `RetryDelegatingHandler`
-  - Создать `Infrastructure/Http/RetryDelegatingHandler.cs`
-  - Зарегистрировать через `AddHttpMessageHandler` в DI
-  - Убрать дублированный retry-код из обоих провайдеров
-- [ ] **9.5.5** Собрать проект, убедиться что нет ошибок
+- [✅] **9.5.1** 🔴 Исправить `ExtractorService`: передавать тикеры из `DataSources` конфигурации
+  - Создан `Configuration/DataSourcesOptions.cs` в Infrastructure
+  - Создан `Interfaces/ITickerProvider.cs` в Application (абстракция)
+  - Создан `Providers/ConfigTickerProvider.cs` в Infrastructure (реализация)
+  - `ExtractorService` использует `ITickerProvider` для получения тикеров по `SourceType`
+  - Добавлен `AddRangeAsync` в `IRawIngestDataRepository` для batch-сохранения
+- [✅] **9.5.2** 🟡 Исправить `LoaderService`: `AssetType = "YahooFinance"` → реальный тип
+  - Метод `ResolveAssetType`: CoinGecko → "Crypto", YahooFinance → "Stock"
+- [✅] **9.5.3** 🟡 Оптимизировать `LoaderService`: устранить N+1 запросы
+  - In-memory кэш для dimensions (asset/date/source) внутри batch
+  - Один `AddRangeAsync` для всех фактов в конце
+- [✅] **9.5.4** 🟡 Вынести retry-логику в `RetryDelegatingHandler`
+  - Создан `Infrastructure/Http/RetryDelegatingHandler.cs`
+  - Зарегистрирован через `AddHttpMessageHandler` для обоих провайдеров
+  - Удалён дублированный retry-код из `YahooFinanceProvider` и `CoinGeckoProvider`
+- [✅] **9.5.5** Собрать проект, убедиться что нет ошибок
 
 ---
 

@@ -9,7 +9,7 @@ namespace FinDistill.Infrastructure.Providers;
 /// <summary>
 /// Market data provider for CoinGecko free API.
 /// Fetches historical market data for cryptocurrencies.
-/// Implements exponential backoff for HTTP 429 responses.
+/// Retry logic is handled by RetryDelegatingHandler in the HTTP pipeline.
 /// </summary>
 public class CoinGeckoProvider : IMarketDataProvider
 {
@@ -17,7 +17,6 @@ public class CoinGeckoProvider : IMarketDataProvider
     private readonly ILogger<CoinGeckoProvider> _logger;
 
     private const string BaseUrl = "https://api.coingecko.com/api/v3";
-    private const int MaxRetries = 3;
 
     public CoinGeckoProvider(HttpClient httpClient, ILogger<CoinGeckoProvider> logger)
     {
@@ -32,39 +31,11 @@ public class CoinGeckoProvider : IMarketDataProvider
         var encodedCoinId = Uri.EscapeDataString(coinId);
         var url = $"{BaseUrl}/coins/{encodedCoinId}/market_chart?vs_currency=usd&days=5&interval=daily";
 
-        for (var attempt = 0; attempt < MaxRetries + 1; attempt++)
-        {
-            try
-            {
-                var response = await _httpClient.GetAsync(url, ct);
+        var response = await _httpClient.GetAsync(url, ct);
+        response.EnsureSuccessStatusCode();
+        var rawJson = await response.Content.ReadAsStringAsync(ct);
 
-                if (response.StatusCode == HttpStatusCode.TooManyRequests)
-                {
-                    if (attempt < MaxRetries)
-                    {
-                        var delay = TimeSpan.FromSeconds(Math.Pow(2, attempt + 1));
-                        _logger.LogWarning("CoinGecko rate limited for {CoinId}, retrying in {Delay}s (attempt {Attempt}/{MaxRetries})",
-                            coinId, delay.TotalSeconds, attempt + 1, MaxRetries);
-                        await Task.Delay(delay, ct);
-                        continue;
-                    }
-                    break;
-                }
-
-                response.EnsureSuccessStatusCode();
-                var rawJson = await response.Content.ReadAsStringAsync(ct);
-
-                return ConvertToStandardFormat(rawJson, coinId);
-            }
-            catch (HttpRequestException ex) when (attempt < MaxRetries)
-            {
-                var delay = TimeSpan.FromSeconds(Math.Pow(2, attempt + 1));
-                _logger.LogWarning(ex, "CoinGecko request failed for {CoinId}, retrying in {Delay}s", coinId, delay.TotalSeconds);
-                await Task.Delay(delay, ct);
-            }
-        }
-
-        throw new InvalidOperationException($"Failed to fetch data from CoinGecko for {coinId} after {MaxRetries} retries.");
+        return ConvertToStandardFormat(rawJson, coinId);
     }
 
     public async Task<IEnumerable<string>> FetchBulkDataAsync(IEnumerable<string> coinIds, CancellationToken ct)
@@ -114,7 +85,6 @@ public class CoinGeckoProvider : IMarketDataProvider
                 volume = totalVolumes[i][1].GetDecimal();
             }
 
-            // CoinGecko only provides close price in market_chart; use it for all OHLC
             var ticker = coinId.ToUpperInvariant();
             quotes.Add(new
             {

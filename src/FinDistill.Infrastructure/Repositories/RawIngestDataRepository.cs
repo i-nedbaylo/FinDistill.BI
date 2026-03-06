@@ -20,6 +20,12 @@ public class RawIngestDataRepository : IRawIngestDataRepository
         await _context.SaveChangesAsync(ct);
     }
 
+    public async Task AddRangeAsync(IEnumerable<RawIngestData> records, CancellationToken ct)
+    {
+        _context.RawIngestData.AddRange(records);
+        await _context.SaveChangesAsync(ct);
+    }
+
     public async Task<IReadOnlyList<RawIngestData>> GetUnprocessedAsync(CancellationToken ct)
     {
         return await _context.RawIngestData
