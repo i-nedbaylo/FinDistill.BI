@@ -20,7 +20,6 @@ public class RawIngestDataConfiguration : IEntityTypeConfiguration<RawIngestData
         builder.Property(e => e.IsProcessed).HasDefaultValue(false);
 
         builder.HasIndex(e => e.IsProcessed)
-            .HasFilter("[IsProcessed] = 0")
             .HasDatabaseName("IX_RawIngestData_Unprocessed");
     }
 }
