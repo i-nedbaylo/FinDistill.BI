@@ -11,7 +11,7 @@ public class FactQuoteConfiguration : IEntityTypeConfiguration<FactQuote>
         builder.ToTable("FactQuotes", "dwh");
 
         builder.HasKey(e => e.Id);
-        builder.Property(e => e.Id).UseIdentityColumn();
+        builder.Property(e => e.Id).ValueGeneratedOnAdd();
 
         // Foreign keys
         builder.Property(e => e.AssetKey).IsRequired();
