@@ -300,7 +300,7 @@
 
 > Реализуется только после базового функционала (Фазы 0–9). Интерфейс `IDataMartReader` уже заложен в Фазе 1.
 
-- [✅] **11.1** Добавить NuGet-пакет `ClickHouse.Client` 7.8.0 в FinDistIll.Infrastructure
+- [✅] **11.1** Добавить NuGet-пакет `ClickHouse.Client` 7.8.0 в FinDistill.Infrastructure
 - [✅] **11.2** Создать класс настроек `Configuration/ClickHouseOptions.cs`:
   - ConnectionString (из ConnectionStrings:ClickHouse)
 - [✅] **11.3** Реализовать `DataMarts/ClickHouseDataMartReader.cs : IDataMartReader`:
