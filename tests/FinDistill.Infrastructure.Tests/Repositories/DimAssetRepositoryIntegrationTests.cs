@@ -14,6 +14,9 @@ public class DimAssetRepositoryIntegrationTests
         _fixture = fixture;
     }
 
+    private static string UniqueTicker(string prefix = "T") =>
+        $"{prefix}{Guid.NewGuid().ToString("N")[..8]}".ToUpperInvariant();
+
     [DockerAvailableFact]
     public async Task UpsertAsync_NewAsset_InsertsAndReturnsWithKey()
     {
@@ -22,7 +25,7 @@ public class DimAssetRepositoryIntegrationTests
 
         var asset = new DimAsset
         {
-            Ticker = $"TEST_{Guid.NewGuid():N}",
+            Ticker = UniqueTicker("NEW"),
             Name = "Test Asset",
             AssetType = "Stock",
             IsActive = true,
@@ -42,7 +45,7 @@ public class DimAssetRepositoryIntegrationTests
         await using var context = _fixture.CreateDbContext();
         var repo = new DimAssetRepository(context);
 
-        var ticker = $"UPD_{Guid.NewGuid():N}";
+        var ticker = UniqueTicker("UPD");
 
         var original = await repo.UpsertAsync(new DimAsset
         {
@@ -76,7 +79,7 @@ public class DimAssetRepositoryIntegrationTests
         await using var context = _fixture.CreateDbContext();
         var repo = new DimAssetRepository(context);
 
-        var result = await repo.GetByTickerAsync("NONEXISTENT_TICKER_XYZ", CancellationToken.None);
+        var result = await repo.GetByTickerAsync("ZZZNOTEXIST", CancellationToken.None);
 
         Assert.Null(result);
     }
@@ -87,7 +90,7 @@ public class DimAssetRepositoryIntegrationTests
         await using var context = _fixture.CreateDbContext();
         var repo = new DimAssetRepository(context);
 
-        var ticker = $"GET_{Guid.NewGuid():N}";
+        var ticker = UniqueTicker("GET");
         await repo.UpsertAsync(new DimAsset
         {
             Ticker = ticker,

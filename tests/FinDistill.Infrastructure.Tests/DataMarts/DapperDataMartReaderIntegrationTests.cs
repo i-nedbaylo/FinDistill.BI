@@ -21,11 +21,9 @@ public class DapperDataMartReaderIntegrationTests
     [DockerAvailableFact]
     public async Task GetPortfolioSummaryAsync_WithSeededData_ReturnsRecords()
     {
-        // Seed data
         await using var context = _fixture.CreateDbContext();
         await SeedTestDataAsync(context);
 
-        // Create DapperDataMartReader
         var reader = CreateReader();
 
         var results = await reader.GetPortfolioSummaryAsync(CancellationToken.None);
@@ -40,6 +38,9 @@ public class DapperDataMartReaderIntegrationTests
     [DockerAvailableFact]
     public async Task GetDailyPerformanceAsync_WithSeededData_ReturnsRecords()
     {
+        await using var context = _fixture.CreateDbContext();
+        await SeedTestDataAsync(context);
+
         var reader = CreateReader();
 
         var results = await reader.GetDailyPerformanceAsync(CancellationToken.None);
@@ -53,6 +54,9 @@ public class DapperDataMartReaderIntegrationTests
     [DockerAvailableFact]
     public async Task GetAssetHistoryAsync_WithSeededData_ReturnsRecords()
     {
+        await using var context = _fixture.CreateDbContext();
+        await SeedTestDataAsync(context);
+
         var reader = CreateReader();
 
         var results = await reader.GetAssetHistoryAsync("INTG_AAPL", 30, CancellationToken.None);
@@ -67,6 +71,9 @@ public class DapperDataMartReaderIntegrationTests
 
     private DapperDataMartReader CreateReader()
     {
+        // Ensure Dapper type handlers are registered
+        Dapper.SqlMapper.AddTypeHandler(new FinDistill.Infrastructure.Persistence.DateOnlyTypeHandler());
+
         var configDict = new Dictionary<string, string?>
         {
             ["ConnectionStrings:DefaultConnection"] = _fixture.ConnectionString,

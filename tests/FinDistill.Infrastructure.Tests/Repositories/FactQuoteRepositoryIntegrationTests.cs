@@ -22,7 +22,7 @@ public class FactQuoteRepositoryIntegrationTests
         // Seed dimension data
         var asset = new DimAsset
         {
-            Ticker = $"FQ_{Guid.NewGuid():N}",
+            Ticker = $"FQ{Guid.NewGuid().ToString("N")[..8]}".ToUpperInvariant(),
             Name = "FactQuote Test",
             AssetType = "Stock",
             IsActive = true,
@@ -37,7 +37,7 @@ public class FactQuoteRepositoryIntegrationTests
 
         var source = new DimSource
         {
-            SourceName = $"TestSrc_{Guid.NewGuid():N}",
+            SourceName = $"Src{Guid.NewGuid().ToString("N")[..8]}",
             BaseUrl = "https://test.com",
             IsActive = true
         };
