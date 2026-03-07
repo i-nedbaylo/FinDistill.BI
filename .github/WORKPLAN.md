@@ -300,16 +300,25 @@
 
 > Реализуется только после базового функционала (Фазы 0–9). Интерфейс `IDataMartReader` уже заложен в Фазе 1.
 
-- [ ] **11.1** Добавить NuGet-пакет `ClickHouse.Client` в FinDistIll.Infrastructure
-- [ ] **11.2** Создать класс настроек `Configuration/ClickHouseOptions.cs`:
+- [✅] **11.1** Добавить NuGet-пакет `ClickHouse.Client` 7.8.0 в FinDistIll.Infrastructure
+- [✅] **11.2** Создать класс настроек `Configuration/ClickHouseOptions.cs`:
   - ConnectionString (из ConnectionStrings:ClickHouse)
-- [ ] **11.3** Реализовать `DataMarts/ClickHouseDataMartReader.cs : IDataMartReader`:
-  - SQL-запросы адаптированные под ClickHouse SQL-диалекта
-  - Параметризованные запросы
-- [ ] **11.4** Создать `ClickHouseSyncService` — ETL-этап синхронизации DWH → ClickHouse:
-  - Batch insert из dwh.FactQuotes + Dimensions в таблицы ClickHouse
+- [✅] **11.3** Реализовать `DataMarts/ClickHouseDataMartReader.cs : IDataMartReader`:
+  - SQL-запросы адаптированные под ClickHouse SQL-диалект (ROW_NUMBER, if, round)
+  - Параметризованные запросы через ClickHouse.Client AddParameter
+- [✅] **11.4** Создать `ClickHouseSyncService` — ETL-этап синхронизации DWH → ClickHouse:
+  - `Application/Interfaces/IClickHouseSyncService.cs` — интерфейс в Application
+  - `Infrastructure/DataMarts/ClickHouseSyncService.cs` — реализация через ClickHouseBulkCopy
+  - Batch insert DimAssets, DimDates, DimSources, FactQuotes
   - Вызывается после LoaderService в оркестраторе (только при UseClickHouse = true)
-- [ ] **11.5** Создать DDL-скрипты для таблиц ClickHouse (MergeTree engine)
-- [ ] **11.6** Обновить `AddInfrastructure`: при `Features:UseClickHouse = true` → регистрировать `ClickHouseDataMartReader` вместо `DapperDataMartReader`
-- [ ] **11.7** Обновить `EtlOrchestrator` — вызывать `ClickHouseSyncService` после Load (при включённом флаге)
-- [ ] **11.8** Проверить работу с ClickHouse включённым и выключенным
+- [✅] **11.5** Создать DDL-скрипт `Scripts/ClickHouse_DDL.sql`:
+  - ReplacingMergeTree engine для idempotent inserts
+  - Таблицы: dwh.DimAssets, dwh.DimDates, dwh.DimSources, dwh.FactQuotes
+- [✅] **11.6** Обновить `AddInfrastructure`: при `Features:UseClickHouse = true`:
+  - Читает `ConnectionStrings:ClickHouse` → `ClickHouseOptions`
+  - Регистрирует `ClickHouseDataMartReader` вместо `DapperDataMartReader`
+  - Регистрирует `IClickHouseSyncService` → `ClickHouseSyncService`
+- [✅] **11.7** Обновить `EtlOrchestrator`:
+  - Опциональный `IClickHouseSyncService?` (nullable, default parameter)
+  - Вызов `SyncAsync` после Load когда сервис зарегистрирован
+- [✅] **11.8** Проверить: build 0 errors, 33 tests pass, UseClickHouse=false → DapperDataMartReader

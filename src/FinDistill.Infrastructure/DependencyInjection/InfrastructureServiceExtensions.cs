@@ -61,9 +61,21 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<IDimSourceRepository, DimSourceRepository>();
         services.AddScoped<IFactQuoteRepository, FactQuoteRepository>();
 
-        // Data Mart reader
-        // Default: Dapper. ClickHouse support will be added in Phase 11.
-        services.AddScoped<IDataMartReader, DapperDataMartReader>();
+        // Data Mart reader — ClickHouse or Dapper
+        if (features.UseClickHouse)
+        {
+            var clickHouseCs = configuration.GetConnectionString("ClickHouse")
+                ?? throw new InvalidOperationException(
+                    "ConnectionStrings:ClickHouse is required when Features:UseClickHouse is true.");
+
+            services.Configure<ClickHouseOptions>(o => o.ConnectionString = clickHouseCs);
+            services.AddScoped<IDataMartReader, ClickHouseDataMartReader>();
+            services.AddScoped<IClickHouseSyncService, ClickHouseSyncService>();
+        }
+        else
+        {
+            services.AddScoped<IDataMartReader, DapperDataMartReader>();
+        }
 
         // Cache service
         // Default: NullCacheService (no-op). Redis support will be added in Phase 10.
