@@ -5,9 +5,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FinDistill.Infrastructure.Repositories;
 
-// <summary>
-// EF Core implementation of <see cref="IDimSourceRepository"/>.
-// </summary>
+/// <summary>
+/// EF Core implementation of <see cref="IDimSourceRepository"/>.
+/// </summary>
 public class DimSourceRepository : IDimSourceRepository
 {
     private readonly FinDistillDbContext _context;
