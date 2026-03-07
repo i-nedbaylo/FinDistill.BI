@@ -322,3 +322,60 @@
   - Опциональный `IClickHouseSyncService?` (nullable, default parameter)
   - Вызов `SyncAsync` после Load когда сервис зарегистрирован
 - [✅] **11.8** Проверить: build 0 errors, 33 tests pass, UseClickHouse=false → DapperDataMartReader
+
+---
+
+## Фаза 12. Result Pattern (опциональная)
+
+> Замена механизма обработки ошибок: вместо try/catch + возврат null → явный `Result<T>` / `Result` тип.
+> Повышает читаемость, тестируемость и вытесняет исключения из flow-control.
+
+- [ ] **12.1** Создать `Result<T>` и `Result` типы в Domain:
+  - `Domain/Common/Result.cs` — `IsSuccess`, `IsFailure`, `Error`
+  - `Domain/Common/Result{T}.cs` — generic-версия с `Value`
+  - `Domain/Common/Error.cs` — `Code`, `Message` (value object)
+  - Immutable, без исключений в конструкторе
+- [ ] **12.2** Рефакторинг ETL-сервисов (Application):
+  - `ExtractorService.ExtractAsync` → `Task<Result>`
+  - `TransformerService.TransformAsync` → `Task<Result<IReadOnlyList<ParsedQuoteDto>>>`
+  - `LoaderService.LoadAsync` → `Task<Result>`
+  - `EtlOrchestrator.RunEtlPipelineAsync` → проверяет `result.IsFailure`, логирует `result.Error`
+- [ ] **12.3** Рефакторинг DashboardService:
+  - `GetDailyPerformanceAsync` → `Task<Result<IReadOnlyList<DailyPerformanceDto>>>`
+  - Контроллеры: pattern match по `result.IsSuccess` → View / Error page
+- [ ] **12.4** Рефакторинг Repository-методов (Domain interfaces):
+  - `UpsertAsync` → `Task<Result<DimAsset>>`
+  - `ExistsAsync` → оставить `Task<bool>` (не нуждается в Result)
+- [ ] **12.5** Обновить unit-тесты:
+  - Assert на `result.IsSuccess` / `result.IsFailure` / `result.Error.Code`
+- [ ] **12.6** Собрать проект, все тесты зелёные
+
+---
+
+## Фаза 13. Integration-тесты с Testcontainers (опциональная)
+
+> Реальные integration-тесты с SQL Server / PostgreSQL в Docker-контейнерах.
+> Проверяют EF Core миграции, репозитории, Dapper-запросы на реальной СУБД.
+
+- [ ] **13.1** Добавить NuGet-пакеты в `FinDistill.Infrastructure.Tests`:
+  - `Testcontainers` (базовый пакет)
+  - `Testcontainers.MsSql` (SQL Server контейнер)
+  - `Testcontainers.PostgreSql` (PostgreSQL контейнер)
+  - `Microsoft.EntityFrameworkCore.Design` (для миграций в тестах)
+- [ ] **13.2** Создать `Fixtures/SqlServerContainerFixture.cs`:
+  - `IAsyncLifetime`: StartAsync → поднять контейнер, StopAsync → остановить
+  - Автоматическое применение миграций (`context.Database.MigrateAsync`)
+  - Экспортирует connection string для тестов
+- [ ] **13.3** Создать `Fixtures/PostgreSqlContainerFixture.cs`:
+  - Аналогичный fixture для PostgreSQL
+- [ ] **13.4** Создать integration-тесты для репозиториев:
+  - `Repositories/DimAssetRepositoryIntegrationTests.cs` — UpsertAsync insert → update, GetByTickerAsync
+  - `Repositories/DimDateRepositoryIntegrationTests.cs` — EnsureDateExistsAsync idempotent
+  - `Repositories/FactQuoteRepositoryIntegrationTests.cs` — AddRangeAsync + ExistsAsync
+  - `Repositories/RawIngestDataRepositoryIntegrationTests.cs` — AddRangeAsync + GetUnprocessedAsync + MarkAsProcessedAsync
+- [ ] **13.5** Создать integration-тест для DapperDataMartReader:
+  - Применить миграции + seed данные → проверить SQL Views через Dapper
+- [ ] **13.6** Создать integration-тест для EF Core миграций:
+  - `context.Database.MigrateAsync()` → не бросает exception
+  - Проверить существование схем `lake`, `dwh`, `mart`
+- [ ] **13.7** Собрать и запустить тесты: `dotnet test` — все зелёные
