@@ -6,6 +6,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FinDistill.Infrastructure.Repositories;
 
+/// <summary>
+/// EF Core implementation of <see cref="IDimDateRepository"/>.
+/// Auto-populates all calendar fields when creating a new DimDate.
+/// </summary>
 public class DimDateRepository : IDimDateRepository
 {
     private readonly FinDistillDbContext _context;

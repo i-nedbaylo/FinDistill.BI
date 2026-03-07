@@ -8,9 +8,15 @@ namespace FinDistill.Domain.Interfaces;
 /// </summary>
 public interface IDataMartReader
 {
+    /// <summary>Reads daily price change performance for all active assets.</summary>
     Task<IReadOnlyList<DailyPerformanceRecord>> GetDailyPerformanceAsync(CancellationToken ct);
 
+    /// <summary>Reads OHLCV history for a specific asset over a number of days.</summary>
+    /// <param name="ticker">Asset ticker symbol.</param>
+    /// <param name="days">Number of historical days to retrieve.</param>
+    /// <param name="ct">Cancellation token.</param>
     Task<IReadOnlyList<AssetHistoryRecord>> GetAssetHistoryAsync(string ticker, int days, CancellationToken ct);
 
+    /// <summary>Reads portfolio summary with last/previous close and change percentage.</summary>
     Task<IReadOnlyList<PortfolioSummaryRecord>> GetPortfolioSummaryAsync(CancellationToken ct);
 }

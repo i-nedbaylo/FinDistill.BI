@@ -2,6 +2,9 @@ using FinDistill.Application.DTOs;
 
 namespace FinDistill.Web.ViewModels;
 
+/// <summary>
+/// View model for the asset detail page with price chart and OHLCV history table.
+/// </summary>
 public class AssetDetailViewModel
 {
     public string Ticker { get; set; } = string.Empty;

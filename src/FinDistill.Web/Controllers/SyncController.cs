@@ -3,6 +3,9 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace FinDistill.Web.Controllers;
 
+/// <summary>
+/// Handles manual ETL pipeline trigger from the dashboard UI.
+/// </summary>
 public class SyncController : Controller
 {
     private readonly IEtlOrchestrator _etlOrchestrator;

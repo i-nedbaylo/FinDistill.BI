@@ -5,6 +5,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FinDistill.Infrastructure.Repositories;
 
+/// <summary>
+/// EF Core implementation of <see cref="IRawIngestDataRepository"/>.
+/// </summary>
 public class RawIngestDataRepository : IRawIngestDataRepository
 {
     private readonly FinDistillDbContext _context;
