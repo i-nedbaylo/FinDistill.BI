@@ -296,96 +296,25 @@
 
 ---
 
-## Фаза 11. ClickHouse для Data Marts (опциональная)
+## Фаза 14. Runtime-исправления и code review (ветка loading-errors-fix)
 
-> Реализуется только после базового функционала (Фазы 0–9). Интерфейс `IDataMartReader` уже заложен в Фазе 1.
+> Исправления выявленные при первом запуске приложения и code review PR.
 
-- [✅] **11.1** Добавить NuGet-пакет `ClickHouse.Client` 7.8.0 в FinDistill.Infrastructure
-- [✅] **11.2** Создать класс настроек `Configuration/ClickHouseOptions.cs`:
-  - ConnectionString (из ConnectionStrings:ClickHouse)
-- [✅] **11.3** Реализовать `DataMarts/ClickHouseDataMartReader.cs : IDataMartReader`:
-  - SQL-запросы адаптированные под ClickHouse SQL-диалект (ROW_NUMBER, if, round)
-  - Параметризованные запросы через ClickHouse.Client AddParameter
-- [✅] **11.4** Создать `ClickHouseSyncService` — ETL-этап синхронизации DWH → ClickHouse:
-  - `Application/Interfaces/IClickHouseSyncService.cs` — интерфейс в Application
-  - `Infrastructure/DataMarts/ClickHouseSyncService.cs` — реализация через ClickHouseBulkCopy
-  - Batch insert DimAssets, DimDates, DimSources, FactQuotes
-  - Вызывается после LoaderService в оркестраторе (только при UseClickHouse = true)
-- [✅] **11.5** Создать DDL-скрипт `Scripts/ClickHouse_DDL.sql`:
-  - ReplacingMergeTree engine для idempotent inserts
-  - Таблицы: dwh.DimAssets, dwh.DimDates, dwh.DimSources, dwh.FactQuotes
-- [✅] **11.6** Обновить `AddInfrastructure`: при `Features:UseClickHouse = true`:
-  - Читает `ConnectionStrings:ClickHouse` → `ClickHouseOptions`
-  - Регистрирует `ClickHouseDataMartReader` вместо `DapperDataMartReader`
-  - Регистрирует `IClickHouseSyncService` → `ClickHouseSyncService`
-- [✅] **11.7** Обновить `EtlOrchestrator`:
-  - Опциональный `IClickHouseSyncService?` (nullable, default parameter)
-  - Вызов `SyncAsync` после Load когда сервис зарегистрирован
-- [✅] **11.8** Проверить: build 0 errors, 33 tests pass, UseClickHouse=false → DapperDataMartReader
-
----
-
-## Фаза 12. Result Pattern (опциональная)
-
-> Замена механизма обработки ошибок: вместо try/catch + возврат null → явный `Result<T>` / `Result` тип.
-> Повышает читаемость, тестируемость и вытесняет исключения из flow-control.
-
-- [✅] **12.1** Создать `Result<T>` и `Result` типы в Domain:
-  - `Domain/Common/Result.cs` — `IsSuccess`, `IsFailure`, `Error`, generic `Result<T>` с `Value`
-  - `Domain/Common/Error.cs` — `Code`, `Message` (sealed record)
-  - Immutable, без исключений в конструкторе
-- [✅] **12.2** Рефакторинг ETL-сервисов (Application):
-  - `ExtractorService.ExtractAsync` → `Task<Result>` (PartialFailure при ошибке провайдера)
-  - `TransformerService.TransformAsync` → `Task<Result<IReadOnlyList<ParsedQuoteDto>>>`
-  - `LoaderService.LoadAsync` → `Task<Result>` (try/catch → Failure)
-  - `EtlOrchestrator.RunEtlPipelineAsync` → `Task<Result>`, проверяет `result.IsFailure`, логирует `result.Error`
-- [✅] **12.3** Рефакторинг DashboardService:
-  - `GetDailyPerformanceAsync` → `Task<Result<IReadOnlyList<DailyPerformanceDto>>>`
-  - `GetAssetHistoryAsync` → `Task<Result<IReadOnlyList<AssetHistoryDto>>>`
-  - `GetPortfolioSummaryAsync` → `Task<Result<IReadOnlyList<PortfolioSummaryDto>>>`
-  - Контроллеры: pattern match по `result.IsSuccess` → View / fallback empty
-- [✅] **12.4** Рефакторинг Repository-методов (Domain interfaces):
-  - Решено **не менять** — `UpsertAsync`, `ExistsAsync` оставлены без Result (репозитории бросают исключения, ловятся в ETL-сервисах)
-- [✅] **12.5** Обновить unit-тесты:
-  - Assert на `result.IsSuccess` / `result.IsFailure` / `result.Error.Code` / `result.Value`
-  - Добавлен новый тест `RunEtlPipelineAsync_TransformFailure_ReturnsFailure`
-  - Добавлен новый тест `ExtractAsync_ProviderThrows_ReturnsPartialFailure`
-- [✅] **12.6** Собрать проект, все тесты зелёные: build 0 errors, 34 tests pass
-
----
-
-## Фаза 13. Integration-тесты с Testcontainers (опциональная)
-
-> Реальные integration-тесты с SQL Server / PostgreSQL в Docker-контейнерах.
-> Проверяют EF Core миграции, репозитории, Dapper-запросы на реальной СУБД.
-> Тесты используют `[DockerAvailableFact]` — автоматически skip при отсутствии Docker.
-
-- [✅] **13.1** Добавить NuGet-пакеты в `FinDistill.Infrastructure.Tests`:
-  - `Testcontainers` 4.3.0 (базовый пакет)
-  - `Testcontainers.MsSql` 4.3.0 (SQL Server контейнер)
-  - `Testcontainers.PostgreSql` 4.3.0 (PostgreSQL контейнер)
-  - `Microsoft.EntityFrameworkCore.Design` 8.0.16 (для миграций в тестах)
-- [✅] **13.2** Создать `Fixtures/SqlServerContainerFixture.cs`:
-  - `IAsyncLifetime`: StartAsync → Build + поднять контейнер, StopAsync → остановить
-  - Автоматическое применение миграций (`context.Database.MigrateAsync`)
-  - Экспортирует connection string для тестов
-  - `[CollectionDefinition("SqlServer")]` для shared fixture
-- [✅] **13.3** Создать `Fixtures/PostgreSqlContainerFixture.cs`:
-  - Аналогичный fixture для PostgreSQL (postgres:16-alpine)
-  - `[CollectionDefinition("PostgreSql")]`
-- [✅] **13.4** Создать `Fixtures/DockerAvailableFactAttribute.cs`:
-  - Кастомный `[DockerAvailableFact]` — skip при отсутствии Docker daemon
-  - Проверка через `docker info` process
-- [✅] **13.5** Создать integration-тесты для репозиториев:
-  - `Repositories/DimAssetRepositoryIntegrationTests.cs` — UpsertAsync insert → update, GetByTickerAsync
-  - `Repositories/DimDateRepositoryIntegrationTests.cs` — EnsureDateExistsAsync idempotent, weekend detection
-  - `Repositories/FactQuoteRepositoryIntegrationTests.cs` — AddRangeAsync + ExistsAsync
-  - `Repositories/RawIngestDataRepositoryIntegrationTests.cs` — AddRangeAsync + GetUnprocessedAsync + MarkAsProcessedAsync
-- [✅] **13.6** Создать integration-тест для DapperDataMartReader:
-  - `DataMarts/DapperDataMartReaderIntegrationTests.cs` — seed данные → проверить SQL Views через Dapper
-  - GetPortfolioSummaryAsync, GetDailyPerformanceAsync, GetAssetHistoryAsync
-- [✅] **13.7** Создать integration-тест для EF Core миграций:
-  - `Migrations/MigrationIntegrationTests.cs` — no pending migrations
-  - Проверить существование схем `lake`, `dwh`, `mart`
-  - Проверить существование mart views
-- [✅] **13.8** Собрать и запустить тесты: build 0 errors, 35 tests (28 app + 7 infra unit) pass, 20 integration tests skipped (Docker not available)
+- [✅] **14.1** Создать БД `FinDistillBI` и применить EF Core миграции (`dotnet ef database update`)
+- [✅] **14.2** 🔴 Исправить DI: `AddHttpClient<IMarketDataProvider, T>` перезаписывал регистрацию
+  - Возвращён паттерн `AddHttpClient<T>()` + `AddScoped<IMarketDataProvider, T>()`
+  - Оба провайдера теперь корректно разрешаются через `IEnumerable<IMarketDataProvider>`
+- [✅] **14.3** Добавить `User-Agent` и `Accept` заголовки в HttpClient для Yahoo и CoinGecko (устраняет 403)
+- [✅] **14.4** 🔴 Исправить `RetryDelegatingHandler`: pre-buffer content в `byte[]` до retry loop
+  - Заменён `CloneRequestAsync` (async) на синхронный `CloneRequest(byte[])`
+  - Устранён баг с consumed stream при retry POST/PUT запросов
+- [✅] **14.5** Заменить недостижимый fallback на `throw new InvalidOperationException` в retry handler
+- [✅] **14.6** 🔴 Исправить `LoaderService`: intra-batch deduplication через `HashSet<(int,int,int)>`
+  - Устранено `DbUpdateException: duplicate key` при повторных запросах к CoinGecko
+- [✅] **14.7** Добавить тест `LoadAsync_IntraBatchDuplicates_InsertsOnlyFirst` для новой логики dedup
+- [✅] **14.8** Code review: исправить `DateOnlyTypeHandler.Parse` — обработка DateTime/DateOnly/string
+- [✅] **14.9** Code review: `RawIngestDataRepositoryIntegrationTests` — фильтровать по `uniqueSource`
+- [✅] **14.10** Code review: `SeedTestDataAsync` — idempotent seed для каждой сущности отдельно
+- [✅] **14.11** Code review: `Microsoft.EntityFrameworkCore.Design` → добавить `PrivateAssets="all"`
+- [✅] **14.12** Code review: `DockerAvailableFactAttribute` — удалить `TryStartDockerDesktop`, убить процесс при timeout
+- [✅] **14.13** Собрать проект: build 0 errors, 73 tests pass
