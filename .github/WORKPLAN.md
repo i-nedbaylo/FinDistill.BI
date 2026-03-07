@@ -358,26 +358,34 @@
 
 > Реальные integration-тесты с SQL Server / PostgreSQL в Docker-контейнерах.
 > Проверяют EF Core миграции, репозитории, Dapper-запросы на реальной СУБД.
+> Тесты используют `[DockerAvailableFact]` — автоматически skip при отсутствии Docker.
 
-- [ ] **13.1** Добавить NuGet-пакеты в `FinDistill.Infrastructure.Tests`:
-  - `Testcontainers` (базовый пакет)
-  - `Testcontainers.MsSql` (SQL Server контейнер)
-  - `Testcontainers.PostgreSql` (PostgreSQL контейнер)
-  - `Microsoft.EntityFrameworkCore.Design` (для миграций в тестах)
-- [ ] **13.2** Создать `Fixtures/SqlServerContainerFixture.cs`:
-  - `IAsyncLifetime`: StartAsync → поднять контейнер, StopAsync → остановить
+- [✅] **13.1** Добавить NuGet-пакеты в `FinDistill.Infrastructure.Tests`:
+  - `Testcontainers` 4.3.0 (базовый пакет)
+  - `Testcontainers.MsSql` 4.3.0 (SQL Server контейнер)
+  - `Testcontainers.PostgreSql` 4.3.0 (PostgreSQL контейнер)
+  - `Microsoft.EntityFrameworkCore.Design` 8.0.16 (для миграций в тестах)
+- [✅] **13.2** Создать `Fixtures/SqlServerContainerFixture.cs`:
+  - `IAsyncLifetime`: StartAsync → Build + поднять контейнер, StopAsync → остановить
   - Автоматическое применение миграций (`context.Database.MigrateAsync`)
   - Экспортирует connection string для тестов
-- [ ] **13.3** Создать `Fixtures/PostgreSqlContainerFixture.cs`:
-  - Аналогичный fixture для PostgreSQL
-- [ ] **13.4** Создать integration-тесты для репозиториев:
+  - `[CollectionDefinition("SqlServer")]` для shared fixture
+- [✅] **13.3** Создать `Fixtures/PostgreSqlContainerFixture.cs`:
+  - Аналогичный fixture для PostgreSQL (postgres:16-alpine)
+  - `[CollectionDefinition("PostgreSql")]`
+- [✅] **13.4** Создать `Fixtures/DockerAvailableFactAttribute.cs`:
+  - Кастомный `[DockerAvailableFact]` — skip при отсутствии Docker daemon
+  - Проверка через `docker info` process
+- [✅] **13.5** Создать integration-тесты для репозиториев:
   - `Repositories/DimAssetRepositoryIntegrationTests.cs` — UpsertAsync insert → update, GetByTickerAsync
-  - `Repositories/DimDateRepositoryIntegrationTests.cs` — EnsureDateExistsAsync idempotent
+  - `Repositories/DimDateRepositoryIntegrationTests.cs` — EnsureDateExistsAsync idempotent, weekend detection
   - `Repositories/FactQuoteRepositoryIntegrationTests.cs` — AddRangeAsync + ExistsAsync
   - `Repositories/RawIngestDataRepositoryIntegrationTests.cs` — AddRangeAsync + GetUnprocessedAsync + MarkAsProcessedAsync
-- [ ] **13.5** Создать integration-тест для DapperDataMartReader:
-  - Применить миграции + seed данные → проверить SQL Views через Dapper
-- [ ] **13.6** Создать integration-тест для EF Core миграций:
-  - `context.Database.MigrateAsync()` → не бросает exception
+- [✅] **13.6** Создать integration-тест для DapperDataMartReader:
+  - `DataMarts/DapperDataMartReaderIntegrationTests.cs` — seed данные → проверить SQL Views через Dapper
+  - GetPortfolioSummaryAsync, GetDailyPerformanceAsync, GetAssetHistoryAsync
+- [✅] **13.7** Создать integration-тест для EF Core миграций:
+  - `Migrations/MigrationIntegrationTests.cs` — no pending migrations
   - Проверить существование схем `lake`, `dwh`, `mart`
-- [ ] **13.7** Собрать и запустить тесты: `dotnet test` — все зелёные
+  - Проверить существование mart views
+- [✅] **13.8** Собрать и запустить тесты: build 0 errors, 35 tests (28 app + 7 infra unit) pass, 20 integration tests skipped (Docker not available)

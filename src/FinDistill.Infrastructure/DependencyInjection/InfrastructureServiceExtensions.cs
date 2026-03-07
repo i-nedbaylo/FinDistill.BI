@@ -1,3 +1,4 @@
+using Dapper;
 using FinDistill.Application.Interfaces;
 using FinDistill.Domain.Interfaces;
 using FinDistill.Infrastructure.Caching;
@@ -20,6 +21,9 @@ public static class InfrastructureServiceExtensions
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
+        // Register Dapper type handlers
+        SqlMapper.AddTypeHandler(new DateOnlyTypeHandler());
+
         // Options
         services.Configure<DatabaseOptions>(configuration.GetSection(DatabaseOptions.SectionName));
         services.Configure<FeaturesOptions>(configuration.GetSection(FeaturesOptions.SectionName));
