@@ -5,6 +5,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FinDistill.Infrastructure.Repositories;
 
+/// <summary>
+/// EF Core implementation of <see cref="IFactQuoteRepository"/>.
+/// </summary>
 public class FactQuoteRepository : IFactQuoteRepository
 {
     private readonly FinDistillDbContext _context;

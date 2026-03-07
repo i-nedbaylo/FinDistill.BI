@@ -5,6 +5,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FinDistill.Infrastructure.Repositories;
 
+/// <summary>
+/// EF Core implementation of <see cref="IDimAssetRepository"/>.
+/// </summary>
 public class DimAssetRepository : IDimAssetRepository
 {
     private readonly FinDistillDbContext _context;

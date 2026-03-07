@@ -4,6 +4,9 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace FinDistill.Web.Controllers;
 
+/// <summary>
+/// Displays the main dashboard with portfolio summary and daily performance.
+/// </summary>
 public class DashboardController : Controller
 {
     private readonly IDashboardService _dashboardService;

@@ -4,6 +4,9 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace FinDistill.Web.Controllers;
 
+/// <summary>
+/// Displays historical OHLCV data and Chart.js price chart for a single asset.
+/// </summary>
 public class AssetController : Controller
 {
     private readonly IDashboardService _dashboardService;

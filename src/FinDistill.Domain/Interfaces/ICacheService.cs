@@ -7,9 +7,12 @@ namespace FinDistill.Domain.Interfaces;
 /// </summary>
 public interface ICacheService
 {
+    /// <summary>Retrieves a cached value by key, or null if not found.</summary>
     Task<T?> GetAsync<T>(string key, CancellationToken ct) where T : class;
 
+    /// <summary>Stores a value in cache with the specified expiration.</summary>
     Task SetAsync<T>(string key, T value, TimeSpan expiration, CancellationToken ct) where T : class;
 
+    /// <summary>Removes a cached entry by key.</summary>
     Task RemoveAsync(string key, CancellationToken ct);
 }
