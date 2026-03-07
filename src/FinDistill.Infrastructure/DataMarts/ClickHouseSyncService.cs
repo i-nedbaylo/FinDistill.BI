@@ -12,9 +12,12 @@ namespace FinDistill.Infrastructure.DataMarts;
 /// <summary>
 /// Synchronizes dimension and fact data from the OLTP DWH (EF Core) to ClickHouse tables.
 /// Uses TRUNCATE + bulk insert (full-refresh) to avoid duplicates from ReplacingMergeTree merge lag.
+/// FactQuotes are synced in batched pages to bound memory usage for large tables.
 /// </summary>
 public class ClickHouseSyncService : IClickHouseSyncService
 {
+    private const int FactPageSize = 10_000;
+
     private readonly FinDistillDbContext _dbContext;
     private readonly string _connectionString;
     private readonly ILogger<ClickHouseSyncService> _logger;
@@ -132,26 +135,46 @@ public class ClickHouseSyncService : IClickHouseSyncService
 
     private async Task SyncFactQuotesAsync(ClickHouseConnection connection, CancellationToken ct)
     {
-        var facts = await _dbContext.FactQuotes.AsNoTracking().ToListAsync(ct);
-
         await TruncateTableAsync(connection, "dwh.FactQuotes", ct);
 
-        using var bulkCopy = new ClickHouseBulkCopy(connection)
+        long lastId = 0;
+        int totalRows = 0;
+
+        while (true)
         {
-            DestinationTableName = "dwh.FactQuotes",
-            BatchSize = 5000
-        };
+            var page = await _dbContext.FactQuotes
+                .AsNoTracking()
+                .Where(f => f.Id > lastId)
+                .OrderBy(f => f.Id)
+                .Take(FactPageSize)
+                .ToListAsync(ct);
 
-        var rows = facts.Select(f => new object[]
-        {
-            f.Id, f.AssetKey, f.DateKey, f.SourceKey,
-            f.OpenPrice, f.HighPrice, f.LowPrice, f.ClosePrice,
-            f.Volume, f.LoadedAt
-        });
+            if (page.Count == 0)
+                break;
 
-        await bulkCopy.InitAsync();
-        await bulkCopy.WriteToServerAsync(rows, ct);
+            using var bulkCopy = new ClickHouseBulkCopy(connection)
+            {
+                DestinationTableName = "dwh.FactQuotes",
+                BatchSize = 5000
+            };
 
-        _logger.LogInformation("ClickHouse sync: FactQuotes — {Count} rows", facts.Count);
+            var rows = page.Select(f => new object[]
+            {
+                f.Id, f.AssetKey, f.DateKey, f.SourceKey,
+                f.OpenPrice, f.HighPrice, f.LowPrice, f.ClosePrice,
+                f.Volume, f.LoadedAt
+            });
+
+            await bulkCopy.InitAsync();
+            await bulkCopy.WriteToServerAsync(rows, ct);
+
+            totalRows += page.Count;
+            lastId = page[^1].Id;
+
+            if (page.Count < FactPageSize)
+                break;
+        }
+
+        _logger.LogInformation("ClickHouse sync: FactQuotes — {Count} rows", totalRows);
     }
 }
