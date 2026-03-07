@@ -96,4 +96,27 @@ public class EtlOrchestratorTests
         _loaderMock.Verify(l => l.LoadAsync(
             It.IsAny<IEnumerable<ParsedQuoteDto>>(), It.IsAny<CancellationToken>()), Times.Never);
     }
+
+    [Fact]
+    public async Task RunEtlPipelineAsync_ExtractPartialFailure_ContinuesButReturnsFailure()
+    {
+        var callOrder = new List<string>();
+
+        _extractorMock.Setup(e => e.ExtractAsync(It.IsAny<CancellationToken>()))
+            .Callback(() => callOrder.Add("Extract"))
+            .ReturnsAsync(Result.Failure(new Error("Extract.PartialFailure", "One provider failed")));
+        _transformerMock.Setup(t => t.TransformAsync(It.IsAny<CancellationToken>()))
+            .Callback(() => callOrder.Add("Transform"))
+            .ReturnsAsync(Result.Success<IReadOnlyList<ParsedQuoteDto>>(new List<ParsedQuoteDto> { new() }));
+        _loaderMock.Setup(l => l.LoadAsync(It.IsAny<IEnumerable<ParsedQuoteDto>>(), It.IsAny<CancellationToken>()))
+            .Callback(() => callOrder.Add("Load"))
+            .ReturnsAsync(Result.Success());
+
+        var sut = CreateSut();
+        var result = await sut.RunEtlPipelineAsync(CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Extract.PartialFailure", result.Error.Code);
+        Assert.Equal(["Extract", "Transform", "Load"], callOrder);
+    }
 }

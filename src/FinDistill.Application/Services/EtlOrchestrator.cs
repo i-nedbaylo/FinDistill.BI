@@ -36,6 +36,8 @@ public class EtlOrchestrator : IEtlOrchestrator
         var sw = Stopwatch.StartNew();
         _logger.LogInformation("ETL pipeline started");
 
+        Error? extractWarning = null;
+
         try
         {
             // Extract
@@ -43,6 +45,7 @@ public class EtlOrchestrator : IEtlOrchestrator
             if (extractResult.IsFailure)
             {
                 _logger.LogWarning("ETL Extract reported errors: {Error}", extractResult.Error.Message);
+                extractWarning = extractResult.Error;
             }
 
             // Transform
@@ -89,6 +92,12 @@ public class EtlOrchestrator : IEtlOrchestrator
 
         sw.Stop();
         _logger.LogInformation("ETL pipeline finished in {ElapsedMs} ms", sw.ElapsedMilliseconds);
+
+        if (extractWarning is not null)
+        {
+            return Result.Failure(extractWarning);
+        }
+
         return Result.Success();
     }
 }
