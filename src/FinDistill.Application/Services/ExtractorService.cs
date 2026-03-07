@@ -1,4 +1,5 @@
 using FinDistill.Application.Interfaces;
+using FinDistill.Domain.Common;
 using FinDistill.Domain.Entities;
 using FinDistill.Domain.Interfaces;
 using Microsoft.Extensions.Logging;
@@ -27,8 +28,10 @@ public class ExtractorService : IExtractorService
         _logger = logger;
     }
 
-    public async Task ExtractAsync(CancellationToken ct)
+    public async Task<Result> ExtractAsync(CancellationToken ct)
     {
+        var hasErrors = false;
+
         foreach (var provider in _providers)
         {
             var sourceName = provider.SourceType.ToString();
@@ -72,10 +75,19 @@ public class ExtractorService : IExtractorService
 
                 _logger.LogInformation("ETL Extract completed for {Source}, records saved: {Count}", sourceName, records.Count);
             }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "ETL Extract failed for {Source}", sourceName);
+                hasErrors = true;
             }
         }
+
+        return hasErrors
+            ? Result.Failure(new Error("Extract.PartialFailure", "One or more providers failed during extraction"))
+            : Result.Success();
     }
 }

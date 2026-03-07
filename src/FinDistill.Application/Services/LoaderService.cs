@@ -1,5 +1,6 @@
 using FinDistill.Application.DTOs;
 using FinDistill.Application.Interfaces;
+using FinDistill.Domain.Common;
 using FinDistill.Domain.Entities;
 using FinDistill.Domain.Enums;
 using FinDistill.Domain.Interfaces;
@@ -33,91 +34,109 @@ public class LoaderService : ILoaderService
         _logger = logger;
     }
 
-    public async Task LoadAsync(IEnumerable<ParsedQuoteDto> quotes, CancellationToken ct)
+    public async Task<Result> LoadAsync(IEnumerable<ParsedQuoteDto> quotes, CancellationToken ct)
     {
-        var quoteList = quotes.ToList();
-        _logger.LogInformation("ETL Load started, quotes to process: {Count}", quoteList.Count);
-
-        // In-memory caches to avoid repeated DB lookups within this batch
-        var assetCache = new Dictionary<string, DimAsset>();
-        var dateCache = new Dictionary<DateOnly, DimDate>();
-        var sourceCache = new Dictionary<DataSourceType, DimSource>();
-
-        var factsToInsert = new List<FactQuote>();
-        var skipped = 0;
-
-        foreach (var dto in quoteList)
+        try
         {
-            try
+            var quoteList = quotes.ToList();
+            _logger.LogInformation("ETL Load started, quotes to process: {Count}", quoteList.Count);
+
+            // In-memory caches to avoid repeated DB lookups within this batch
+            var assetCache = new Dictionary<string, DimAsset>();
+            var dateCache = new Dictionary<DateOnly, DimDate>();
+            var sourceCache = new Dictionary<DataSourceType, DimSource>();
+
+            var factsToInsert = new List<FactQuote>();
+            var skipped = 0;
+
+            foreach (var dto in quoteList)
             {
-                // Resolve asset (cached)
-                if (!assetCache.TryGetValue(dto.Ticker, out var asset))
+                try
                 {
-                    asset = await _assetRepo.UpsertAsync(new DimAsset
+                    // Resolve asset (cached)
+                    if (!assetCache.TryGetValue(dto.Ticker, out var asset))
                     {
-                        Ticker = dto.Ticker,
-                        Name = dto.Ticker,
-                        AssetType = ResolveAssetType(dto.SourceType),
-                        IsActive = true,
-                        CreatedAt = DateTime.UtcNow,
-                        UpdatedAt = DateTime.UtcNow
-                    }, ct);
-                    assetCache[dto.Ticker] = asset;
-                }
+                        asset = await _assetRepo.UpsertAsync(new DimAsset
+                        {
+                            Ticker = dto.Ticker,
+                            Name = dto.Ticker,
+                            AssetType = ResolveAssetType(dto.SourceType),
+                            IsActive = true,
+                            CreatedAt = DateTime.UtcNow,
+                            UpdatedAt = DateTime.UtcNow
+                        }, ct);
+                        assetCache[dto.Ticker] = asset;
+                    }
 
-                // Resolve date (cached)
-                if (!dateCache.TryGetValue(dto.Date, out var dimDate))
-                {
-                    dimDate = await _dateRepo.EnsureDateExistsAsync(dto.Date, ct);
-                    dateCache[dto.Date] = dimDate;
-                }
-
-                // Resolve source (cached)
-                if (!sourceCache.TryGetValue(dto.SourceType, out var source))
-                {
-                    source = await _sourceRepo.UpsertAsync(new DimSource
+                    // Resolve date (cached)
+                    if (!dateCache.TryGetValue(dto.Date, out var dimDate))
                     {
-                        SourceName = dto.SourceType.ToString(),
-                        BaseUrl = string.Empty,
-                        IsActive = true
-                    }, ct);
-                    sourceCache[dto.SourceType] = source;
-                }
+                        dimDate = await _dateRepo.EnsureDateExistsAsync(dto.Date, ct);
+                        dateCache[dto.Date] = dimDate;
+                    }
 
-                // Skip if this fact already exists
-                if (await _factRepo.ExistsAsync(asset.AssetKey, dimDate.DateKey, source.SourceKey, ct))
-                {
-                    skipped++;
-                    continue;
-                }
+                    // Resolve source (cached)
+                    if (!sourceCache.TryGetValue(dto.SourceType, out var source))
+                    {
+                        source = await _sourceRepo.UpsertAsync(new DimSource
+                        {
+                            SourceName = dto.SourceType.ToString(),
+                            BaseUrl = string.Empty,
+                            IsActive = true
+                        }, ct);
+                        sourceCache[dto.SourceType] = source;
+                    }
 
-                factsToInsert.Add(new FactQuote
+                    // Skip if this fact already exists
+                    if (await _factRepo.ExistsAsync(asset.AssetKey, dimDate.DateKey, source.SourceKey, ct))
+                    {
+                        skipped++;
+                        continue;
+                    }
+
+                    factsToInsert.Add(new FactQuote
+                    {
+                        AssetKey = asset.AssetKey,
+                        DateKey = dimDate.DateKey,
+                        SourceKey = source.SourceKey,
+                        OpenPrice = dto.Open,
+                        HighPrice = dto.High,
+                        LowPrice = dto.Low,
+                        ClosePrice = dto.Close,
+                        Volume = dto.Volume,
+                        LoadedAt = DateTime.UtcNow
+                    });
+                }
+                catch (OperationCanceledException)
                 {
-                    AssetKey = asset.AssetKey,
-                    DateKey = dimDate.DateKey,
-                    SourceKey = source.SourceKey,
-                    OpenPrice = dto.Open,
-                    HighPrice = dto.High,
-                    LowPrice = dto.Low,
-                    ClosePrice = dto.Close,
-                    Volume = dto.Volume,
-                    LoadedAt = DateTime.UtcNow
-                });
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "ETL Load failed for ticker {Ticker} on {Date}", dto.Ticker, dto.Date);
+                }
             }
-            catch (Exception ex)
+
+            // Batch insert all facts in one SaveChanges call
+            if (factsToInsert.Count > 0)
             {
-                _logger.LogWarning(ex, "ETL Load failed for ticker {Ticker} on {Date}", dto.Ticker, dto.Date);
+                await _factRepo.AddRangeAsync(factsToInsert, ct);
             }
+
+            _logger.LogInformation("ETL Load completed, loaded: {Loaded}, skipped duplicates: {Skipped}",
+                factsToInsert.Count, skipped);
+
+            return Result.Success();
         }
-
-        // Batch insert all facts in one SaveChanges call
-        if (factsToInsert.Count > 0)
+        catch (OperationCanceledException)
         {
-            await _factRepo.AddRangeAsync(factsToInsert, ct);
+            throw;
         }
-
-        _logger.LogInformation("ETL Load completed, loaded: {Loaded}, skipped duplicates: {Skipped}",
-            factsToInsert.Count, skipped);
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "ETL Load failed with unhandled exception");
+            return Result.Failure(new Error("Load.Failed", ex.Message));
+        }
     }
 
     private static string ResolveAssetType(DataSourceType sourceType)

@@ -22,7 +22,7 @@ public class TransformerServiceTests
             {"ticker":"AAPL","date":"2024-01-15","open":100.5,"high":102,"low":99,"close":101,"volume":1000000}
         ]
         """;
-
+        
         _rawRepoMock.Setup(r => r.GetUnprocessedAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<RawIngestData>
             {
@@ -32,11 +32,12 @@ public class TransformerServiceTests
         var sut = CreateSut();
         var result = await sut.TransformAsync(CancellationToken.None);
 
-        Assert.Single(result);
-        Assert.Equal("AAPL", result[0].Ticker);
-        Assert.Equal(new DateOnly(2024, 1, 15), result[0].Date);
-        Assert.Equal(101m, result[0].Close);
-        Assert.Equal(DataSourceType.YahooFinance, result[0].SourceType);
+        Assert.True(result.IsSuccess);
+        Assert.Single(result.Value);
+        Assert.Equal("AAPL", result.Value[0].Ticker);
+        Assert.Equal(new DateOnly(2024, 1, 15), result.Value[0].Date);
+        Assert.Equal(101m, result.Value[0].Close);
+        Assert.Equal(DataSourceType.YahooFinance, result.Value[0].SourceType);
     }
 
     [Fact]
@@ -58,9 +59,10 @@ public class TransformerServiceTests
         var sut = CreateSut();
         var result = await sut.TransformAsync(CancellationToken.None);
 
-        Assert.Equal(2, result.Count);
-        Assert.Equal("AAPL", result[0].Ticker);
-        Assert.Equal("MSFT", result[1].Ticker);
+        Assert.True(result.IsSuccess);
+        Assert.Equal(2, result.Value.Count);
+        Assert.Equal("AAPL", result.Value[0].Ticker);
+        Assert.Equal("MSFT", result.Value[1].Ticker);
     }
 
     [Fact]
@@ -76,7 +78,8 @@ public class TransformerServiceTests
         var sut = CreateSut();
         var result = await sut.TransformAsync(CancellationToken.None);
 
-        Assert.Single(result);
+        Assert.True(result.IsSuccess);
+        Assert.Single(result.Value);
         _rawRepoMock.Verify(r => r.MarkAsProcessedAsync(
             It.Is<IEnumerable<long>>(ids => ids.Contains(2) && !ids.Contains(1)),
             It.IsAny<CancellationToken>()), Times.Once);
@@ -96,7 +99,8 @@ public class TransformerServiceTests
         var sut = CreateSut();
         var result = await sut.TransformAsync(CancellationToken.None);
 
-        Assert.Empty(result);
+        Assert.True(result.IsSuccess);
+        Assert.Empty(result.Value);
     }
 
     [Fact]
@@ -113,7 +117,8 @@ public class TransformerServiceTests
         var sut = CreateSut();
         var result = await sut.TransformAsync(CancellationToken.None);
 
-        Assert.Empty(result);
+        Assert.True(result.IsSuccess);
+        Assert.Empty(result.Value);
     }
 
     [Fact]
@@ -125,7 +130,8 @@ public class TransformerServiceTests
         var sut = CreateSut();
         var result = await sut.TransformAsync(CancellationToken.None);
 
-        Assert.Empty(result);
+        Assert.True(result.IsSuccess);
+        Assert.Empty(result.Value);
         _rawRepoMock.Verify(r => r.MarkAsProcessedAsync(
             It.IsAny<IEnumerable<long>>(), It.IsAny<CancellationToken>()), Times.Never);
     }
@@ -144,12 +150,13 @@ public class TransformerServiceTests
         var sut = CreateSut();
         var result = await sut.TransformAsync(CancellationToken.None);
 
-        Assert.Single(result);
-        Assert.Equal(0m, result[0].Open);
-        Assert.Equal(0m, result[0].High);
-        Assert.Equal(0m, result[0].Low);
-        Assert.Equal(0m, result[0].Close);
-        Assert.Equal(0m, result[0].Volume);
+        Assert.True(result.IsSuccess);
+        Assert.Single(result.Value);
+        Assert.Equal(0m, result.Value[0].Open);
+        Assert.Equal(0m, result.Value[0].High);
+        Assert.Equal(0m, result.Value[0].Low);
+        Assert.Equal(0m, result.Value[0].Close);
+        Assert.Equal(0m, result.Value[0].Volume);
     }
 
     [Fact]
@@ -166,8 +173,9 @@ public class TransformerServiceTests
         var sut = CreateSut();
         var result = await sut.TransformAsync(CancellationToken.None);
 
-        Assert.Single(result);
-        Assert.Equal(DataSourceType.CoinGecko, result[0].SourceType);
+        Assert.True(result.IsSuccess);
+        Assert.Single(result.Value);
+        Assert.Equal(DataSourceType.CoinGecko, result.Value[0].SourceType);
     }
 
     [Fact]
@@ -184,6 +192,7 @@ public class TransformerServiceTests
         var sut = CreateSut();
         var result = await sut.TransformAsync(CancellationToken.None);
 
-        Assert.Empty(result);
+        Assert.True(result.IsSuccess);
+        Assert.Empty(result.Value);
     }
 }

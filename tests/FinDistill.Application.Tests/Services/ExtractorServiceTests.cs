@@ -29,8 +29,9 @@ public class ExtractorServiceTests
         _tickerProviderMock.Setup(t => t.GetTickers(DataSourceType.YahooFinance)).Returns(["AAPL"]);
 
         var sut = CreateSut(providerMock.Object);
-        await sut.ExtractAsync(CancellationToken.None);
+        var result = await sut.ExtractAsync(CancellationToken.None);
 
+        Assert.True(result.IsSuccess);
         _rawRepoMock.Verify(r => r.AddRangeAsync(
             It.Is<IEnumerable<RawIngestData>>(records => records.Count() == 1),
             It.IsAny<CancellationToken>()), Times.Once);
@@ -45,8 +46,9 @@ public class ExtractorServiceTests
         _tickerProviderMock.Setup(t => t.IsEnabled(DataSourceType.YahooFinance)).Returns(false);
 
         var sut = CreateSut(providerMock.Object);
-        await sut.ExtractAsync(CancellationToken.None);
+        var result = await sut.ExtractAsync(CancellationToken.None);
 
+        Assert.True(result.IsSuccess);
         providerMock.Verify(p => p.FetchBulkDataAsync(
             It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()), Times.Never);
     }
@@ -61,14 +63,15 @@ public class ExtractorServiceTests
         _tickerProviderMock.Setup(t => t.GetTickers(DataSourceType.YahooFinance)).Returns([]);
 
         var sut = CreateSut(providerMock.Object);
-        await sut.ExtractAsync(CancellationToken.None);
+        var result = await sut.ExtractAsync(CancellationToken.None);
 
+        Assert.True(result.IsSuccess);
         providerMock.Verify(p => p.FetchBulkDataAsync(
             It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
-    public async Task ExtractAsync_ProviderThrows_ContinuesWithNextProvider()
+    public async Task ExtractAsync_ProviderThrows_ReturnsPartialFailure()
     {
         var failingProvider = new Mock<IMarketDataProvider>();
         failingProvider.Setup(p => p.SourceType).Returns(DataSourceType.YahooFinance);
@@ -85,8 +88,10 @@ public class ExtractorServiceTests
         _tickerProviderMock.Setup(t => t.GetTickers(DataSourceType.CoinGecko)).Returns(["bitcoin"]);
 
         var sut = CreateSut(failingProvider.Object, workingProvider.Object);
-        await sut.ExtractAsync(CancellationToken.None);
+        var result = await sut.ExtractAsync(CancellationToken.None);
 
+        Assert.True(result.IsFailure);
+        Assert.Equal("Extract.PartialFailure", result.Error.Code);
         _rawRepoMock.Verify(r => r.AddRangeAsync(
             It.Is<IEnumerable<RawIngestData>>(records => records.Any()),
             It.IsAny<CancellationToken>()), Times.Once);
@@ -105,8 +110,9 @@ public class ExtractorServiceTests
             .Returns(["AAPL", "MSFT", "SPY"]);
 
         var sut = CreateSut(providerMock.Object);
-        await sut.ExtractAsync(CancellationToken.None);
+        var result = await sut.ExtractAsync(CancellationToken.None);
 
+        Assert.True(result.IsSuccess);
         providerMock.Verify(p => p.FetchBulkDataAsync(
             It.Is<IEnumerable<string>>(tickers => tickers.SequenceEqual(new[] { "AAPL", "MSFT", "SPY" })),
             It.IsAny<CancellationToken>()), Times.Once);

@@ -1,12 +1,13 @@
 using System.Diagnostics;
 using FinDistill.Application.Interfaces;
+using FinDistill.Domain.Common;
 using Microsoft.Extensions.Logging;
 
 namespace FinDistill.Application.Services;
 
 /// <summary>
 /// Orchestrates the full ETL pipeline: Extract → Transform → Load → (optional) ClickHouse Sync.
-/// Catches and logs exceptions at each stage without stopping the pipeline.
+/// Uses Result pattern to propagate errors without exceptions.
 /// </summary>
 public class EtlOrchestrator : IEtlOrchestrator
 {
@@ -30,23 +31,42 @@ public class EtlOrchestrator : IEtlOrchestrator
         _logger = logger;
     }
 
-    public async Task RunEtlPipelineAsync(CancellationToken ct)
+    public async Task<Result> RunEtlPipelineAsync(CancellationToken ct)
     {
         var sw = Stopwatch.StartNew();
         _logger.LogInformation("ETL pipeline started");
 
+        Error? extractWarning = null;
+
         try
         {
             // Extract
-            await _extractor.ExtractAsync(ct);
+            var extractResult = await _extractor.ExtractAsync(ct);
+            if (extractResult.IsFailure)
+            {
+                _logger.LogWarning("ETL Extract reported errors: {Error}", extractResult.Error.Message);
+                extractWarning = extractResult.Error;
+            }
 
             // Transform
-            var parsed = await _transformer.TransformAsync(ct);
+            var transformResult = await _transformer.TransformAsync(ct);
+            if (transformResult.IsFailure)
+            {
+                _logger.LogError("ETL Transform failed: {Error}", transformResult.Error.Message);
+                return Result.Failure(transformResult.Error);
+            }
+
+            var parsed = transformResult.Value;
 
             // Load
             if (parsed.Count > 0)
             {
-                await _loader.LoadAsync(parsed, ct);
+                var loadResult = await _loader.LoadAsync(parsed, ct);
+                if (loadResult.IsFailure)
+                {
+                    _logger.LogError("ETL Load failed: {Error}", loadResult.Error.Message);
+                    return Result.Failure(loadResult.Error);
+                }
 
                 // Sync to ClickHouse (if enabled)
                 if (_clickHouseSync is not null)
@@ -67,9 +87,17 @@ public class EtlOrchestrator : IEtlOrchestrator
         catch (Exception ex)
         {
             _logger.LogError(ex, "ETL pipeline failed with unhandled exception");
+            return Result.Failure(new Error("Etl.UnhandledException", ex.Message));
         }
 
         sw.Stop();
         _logger.LogInformation("ETL pipeline finished in {ElapsedMs} ms", sw.ElapsedMilliseconds);
+
+        if (extractWarning is not null)
+        {
+            return Result.Failure(extractWarning);
+        }
+
+        return Result.Success();
     }
 }

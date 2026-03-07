@@ -43,8 +43,9 @@ public class LoaderServiceTests
         };
 
         var sut = CreateSut();
-        await sut.LoadAsync(quotes, CancellationToken.None);
+        var result = await sut.LoadAsync(quotes, CancellationToken.None);
 
+        Assert.True(result.IsSuccess);
         _factRepoMock.Verify(r => r.AddRangeAsync(
             It.Is<IEnumerable<FactQuote>>(q => q.Count() == 1),
             It.IsAny<CancellationToken>()), Times.Once);
@@ -63,8 +64,9 @@ public class LoaderServiceTests
         };
 
         var sut = CreateSut();
-        await sut.LoadAsync(quotes, CancellationToken.None);
+        var result = await sut.LoadAsync(quotes, CancellationToken.None);
 
+        Assert.True(result.IsSuccess);
         _factRepoMock.Verify(r => r.AddRangeAsync(
             It.IsAny<IEnumerable<FactQuote>>(), It.IsAny<CancellationToken>()), Times.Never);
     }
@@ -82,8 +84,9 @@ public class LoaderServiceTests
         };
 
         var sut = CreateSut();
-        await sut.LoadAsync(quotes, CancellationToken.None);
+        var result = await sut.LoadAsync(quotes, CancellationToken.None);
 
+        Assert.True(result.IsSuccess);
         _assetRepoMock.Verify(r => r.UpsertAsync(
             It.Is<DimAsset>(a => a.AssetType == "Stock"),
             It.IsAny<CancellationToken>()), Times.Once);
@@ -102,8 +105,9 @@ public class LoaderServiceTests
         };
 
         var sut = CreateSut();
-        await sut.LoadAsync(quotes, CancellationToken.None);
+        var result = await sut.LoadAsync(quotes, CancellationToken.None);
 
+        Assert.True(result.IsSuccess);
         _assetRepoMock.Verify(r => r.UpsertAsync(
             It.Is<DimAsset>(a => a.AssetType == "Crypto"),
             It.IsAny<CancellationToken>()), Times.Once);
@@ -124,8 +128,9 @@ public class LoaderServiceTests
         };
 
         var sut = CreateSut();
-        await sut.LoadAsync(quotes, CancellationToken.None);
+        var result = await sut.LoadAsync(quotes, CancellationToken.None);
 
+        Assert.True(result.IsSuccess);
         // Asset UpsertAsync called only once (cached for subsequent calls)
         _assetRepoMock.Verify(r => r.UpsertAsync(It.IsAny<DimAsset>(), It.IsAny<CancellationToken>()), Times.Once);
         // Source UpsertAsync called only once (same SourceType)
@@ -142,8 +147,9 @@ public class LoaderServiceTests
     public async Task LoadAsync_EmptyQuotes_DoesNotCallRepositories()
     {
         var sut = CreateSut();
-        await sut.LoadAsync([], CancellationToken.None);
+        var result = await sut.LoadAsync([], CancellationToken.None);
 
+        Assert.True(result.IsSuccess);
         _assetRepoMock.Verify(r => r.UpsertAsync(It.IsAny<DimAsset>(), It.IsAny<CancellationToken>()), Times.Never);
         _factRepoMock.Verify(r => r.AddRangeAsync(It.IsAny<IEnumerable<FactQuote>>(), It.IsAny<CancellationToken>()), Times.Never);
     }
