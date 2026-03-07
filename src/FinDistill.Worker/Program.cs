@@ -19,16 +19,6 @@ try
         .WriteTo.Console()
         .WriteTo.File("logs/worker-.log", rollingInterval: RollingInterval.Day));
 
-    // Hosting mode
-    var hostingMode = builder.Configuration["HostingMode"] ?? "Console";
-    if (string.Equals(hostingMode, "WindowsService", StringComparison.OrdinalIgnoreCase))
-    {
-        builder.Services.AddWindowsService(options =>
-        {
-            options.ServiceName = "FinDistill.ETL";
-        });
-    }
-
     // DI registration
     builder.Services.AddInfrastructure(builder.Configuration);
     builder.Services.AddApplicationServices();
@@ -42,7 +32,7 @@ try
 
     var host = builder.Build();
 
-    Log.Information("ETL Worker host starting. HostingMode: {HostingMode}", hostingMode);
+    Log.Information("ETL Worker host starting");
     host.Run();
 }
 catch (Exception ex)

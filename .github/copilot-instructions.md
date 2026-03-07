@@ -23,7 +23,6 @@
 | СУБД (OLTP) | MS SQL Server **или** PostgreSQL | Код абстрагирован от конкретной СУБД через провайдер EF Core |
 | СУБД (OLAP, опц.) | ClickHouse | Опциональный провайдер для Data Marts (аналитические запросы). См. раздел 10 |
 | Кэш (опц.) | Redis | Опциональное кэширование Data Marts. См. раздел 10 |
-| Контейнеризация | Docker, Docker Compose | Dockerfile для Web и Worker, docker-compose для полного стека |
 | Логирование | Serilog | Structured logging; sinks: Console, File (минимум) |
 | API-источники | Yahoo Finance (`YahooFinanceApi`), CoinGecko API | Реализация через паттерн Strategy |
 | Графики (фронтенд) | Chart.js **или** Highcharts | JS-библиотека для исторических графиков |
@@ -124,11 +123,7 @@ FinDistill.BI.sln
 Содержит:
 - **`EtlWorker` : `BackgroundService`** — основной фоновый сервис, запускающий ETL по расписанию.
 - **Конфигурация расписания** через `appsettings.json` (`CronExpression` или `IntervalMinutes`).
-- **Хостинг:**
-  - По умолчанию: консольное приложение.
-  - Опционально (через настройку): Windows Service (`UseWindowsService()`) или Docker-контейнер.
-  - Выбор режима хостинга через `appsettings.json` → `"HostingMode": "Console" | "WindowsService" | "Docker"`.
-  - В режиме `"Docker"` конфигурация передаётся через переменные окружения (ASP.NET Core convention: `ConnectionStrings__DefaultConnection`, `Database__Provider` и т.д.).
+- **Хостинг:** консольное приложение.
 
 **Правила:**
 - Это **отдельное приложение**, а не библиотека — имеет собственный `Program.cs` и `appsettings.json`.
@@ -337,7 +332,6 @@ Log.Information("ETL Extract started for {Source}, tickers count: {Count}", sour
     "UseRedis": false,                   // Включить Redis-кэширование
     "UseClickHouse": false               // Включить ClickHouse для Data Marts
   },
-  "HostingMode": "Console",             // "Console" | "WindowsService" | "Docker"
   "Serilog": { ... }
 }
 ```
@@ -379,8 +373,7 @@ FinDistill.Worker         ← Application, Infrastructure
 14. При работе с Dapper всегда используй параметризованные запросы (защита от SQL-injection).
 15. Конфигурация — через Options Pattern (`IOptions<T>` / `IOptionsMonitor<T>`).
 16. **Все внешние зависимости** (БД, кэш, аналитика) — за интерфейсами в Domain; реализации переключаются через конфигурацию.
-17. **Docker-ready:** приложение не должно зависеть от локальных путей; конфигурация через переменные окружения.
-18. **Feature Flags:** опциональные компоненты (Redis, ClickHouse) включаются через секцию `Features` в appsettings.
+17. **Feature Flags:** опциональные компоненты (Redis, ClickHouse) включаются через секцию `Features` в appsettings.
 
 ---
 
@@ -464,44 +457,9 @@ else
 - Запись OLTP-данных (Lake, DWH) **всегда** через EF Core в SQL Server / PostgreSQL.
 - Application-слоем не знает о ClickHouse — только интерфейс `IDataMartReader`.
 
-### 10.3 Docker — контейнеризация
-
-**Цель:** Полный деплой стека (Web + Worker + DB + опционально Redis/ClickHouse) через Docker Compose.
-
-**Архитектурные решения (закладываются сразу):**
-
-1. **Конфигурация через переменные окружения:**
-   - Все настройки из `appsettings.json` переопределяются через env vars.
-   - ASP.NET Core convention: `ConnectionStrings__DefaultConnection`, `Database__Provider`, `Features__UseRedis`.
-
-2. **Health Checks (готовность):**
-   - Web: health check endpoint (`/health`) для проверки подключения к БД.
-   - Worker: логирует статус подключения при старте.
-
-3. **Graceful Shutdown:**
-   - Worker: `BackgroundService` корректно останавливается при `SIGTERM` (через `CancellationToken`).
-   - Все async-методы поддерживают `CancellationToken` (правило 2 из раздела 9).
-
-4. **Docker Compose профили:**
-   ```yaml
-   # docker-compose.yml
-   services:
-     db-sqlserver:          # профиль: sqlserver
-     db-postgres:           # профиль: postgres
-     redis:                 # профиль: redis (опционально)
-     clickhouse:            # профиль: clickhouse (опционально)
-     web:                   # всегда
-     worker:                # всегда
-   ```
-
-**Правила:**
-- Код приложения **не зависит** от Docker — Docker лишь упаковывает и оркестрирует.
-- Никаких hardcoded путей, портов, хостнеймов — всё через конфигурацию.
-
-### 10.4 Сводная таблица Feature Flags
+### 10.3 Сводная таблица Feature Flags
 
 | Feature | Настройка | По умолчанию | Интерфейс (Domain) | Реализация по умолчанию | Опциональная реализация |
 |---|---|---|---|---|---|
 | Redis | `Features:UseRedis` | `false` | `ICacheService` | `NullCacheService` | `RedisCacheService` |
 | ClickHouse | `Features:UseClickHouse` | `false` | `IDataMartReader` | `DapperDataMartReader` | `ClickHouseDataMartReader` |
-| Docker | `HostingMode` | `"Console"` | — | — | Конфигурация через env vars |
