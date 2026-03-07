@@ -47,6 +47,8 @@ public class LoaderService : ILoaderService
             var sourceCache = new Dictionary<DataSourceType, DimSource>();
 
             var factsToInsert = new List<FactQuote>();
+            // Track (AssetKey, DateKey, SourceKey) within the current batch to prevent intra-batch duplicates
+            var batchKeys = new HashSet<(int AssetKey, int DateKey, int SourceKey)>();
             var skipped = 0;
 
             foreach (var dto in quoteList)
@@ -87,7 +89,16 @@ public class LoaderService : ILoaderService
                         sourceCache[dto.SourceType] = source;
                     }
 
-                    // Skip if this fact already exists
+                    var key = (asset.AssetKey, dimDate.DateKey, source.SourceKey);
+
+                    // Skip if already in current batch (intra-batch dedup)
+                    if (!batchKeys.Add(key))
+                    {
+                        skipped++;
+                        continue;
+                    }
+
+                    // Skip if this fact already exists in DB
                     if (await _factRepo.ExistsAsync(asset.AssetKey, dimDate.DateKey, source.SourceKey, ct))
                     {
                         skipped++;

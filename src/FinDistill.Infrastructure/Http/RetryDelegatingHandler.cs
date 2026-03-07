@@ -19,25 +19,23 @@ public class RetryDelegatingHandler : DelegatingHandler
 
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
     {
-        for (var attempt = 0; attempt < MaxRetries + 1; attempt++)
+        HttpResponseMessage? response = null;
+
+        for (var attempt = 0; attempt <= MaxRetries; attempt++)
         {
             try
             {
-                var response = await base.SendAsync(request, ct);
+                response = await base.SendAsync(attempt == 0 ? request : await CloneRequestAsync(request), ct);
 
-                if (response.StatusCode == HttpStatusCode.TooManyRequests)
-                {
-                    if (attempt < MaxRetries)
-                    {
-                        var delay = TimeSpan.FromSeconds(Math.Pow(2, attempt + 1));
-                        _logger.LogWarning("HTTP 429 for {Url}, retrying in {Delay}s (attempt {Attempt}/{MaxRetries})",
-                            request.RequestUri, delay.TotalSeconds, attempt + 1, MaxRetries);
-                        await Task.Delay(delay, ct);
-                        continue;
-                    }
-                }
+                if (response.StatusCode != HttpStatusCode.TooManyRequests || attempt == MaxRetries)
+                    return response;
 
-                return response;
+                response.Dispose();
+
+                var delay = TimeSpan.FromSeconds(Math.Pow(2, attempt + 1));
+                _logger.LogWarning("HTTP 429 for {Url}, retrying in {Delay}s (attempt {Attempt}/{MaxRetries})",
+                    request.RequestUri, delay.TotalSeconds, attempt + 1, MaxRetries);
+                await Task.Delay(delay, ct);
             }
             catch (HttpRequestException ex) when (attempt < MaxRetries)
             {
@@ -48,7 +46,34 @@ public class RetryDelegatingHandler : DelegatingHandler
             }
         }
 
-        // Final attempt — let it throw naturally
-        return await base.SendAsync(request, ct);
+        // Should not reach here, but satisfy compiler
+        return response ?? await base.SendAsync(request, ct);
+    }
+
+    private static async Task<HttpRequestMessage> CloneRequestAsync(HttpRequestMessage request)
+    {
+        var clone = new HttpRequestMessage(request.Method, request.RequestUri)
+        {
+            Version = request.Version
+        };
+
+        if (request.Content is not null)
+        {
+            var ms = new MemoryStream();
+            await request.Content.CopyToAsync(ms);
+            ms.Position = 0;
+            clone.Content = new StreamContent(ms);
+
+            foreach (var header in request.Content.Headers)
+                clone.Content.Headers.TryAddWithoutValidation(header.Key, header.Value);
+        }
+
+        foreach (var header in request.Headers)
+            clone.Headers.TryAddWithoutValidation(header.Key, header.Value);
+
+        foreach (var prop in request.Options)
+            clone.Options.TryAdd(prop.Key, prop.Value);
+
+        return clone;
     }
 }
