@@ -1,5 +1,7 @@
 -- ClickHouse DDL for FinDistill.BI DWH tables
--- Engine: ReplacingMergeTree (idempotent inserts — deduplicates by sorting key)
+-- Engine: ReplacingMergeTree (background deduplication by sorting key/version during merges).
+-- The sync strategy uses TRUNCATE + bulk insert (full-refresh) to guarantee no duplicates.
+-- If querying outside of the sync cycle, use FINAL modifier for strict deduplication.
 
 CREATE DATABASE IF NOT EXISTS dwh;
 
