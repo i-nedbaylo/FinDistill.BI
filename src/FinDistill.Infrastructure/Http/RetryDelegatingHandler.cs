@@ -58,8 +58,8 @@ public class RetryDelegatingHandler : DelegatingHandler
             }
         }
 
-        // Should not reach here, but satisfy compiler
-        return response ?? await base.SendAsync(request, ct);
+        // Should not reach here — the loop always returns or throws before exiting
+        throw new InvalidOperationException("Unreachable code in RetryDelegatingHandler.SendAsync");
     }
 
     private static HttpRequestMessage CloneRequest(HttpRequestMessage request, byte[]? contentBytes, string? contentType)
