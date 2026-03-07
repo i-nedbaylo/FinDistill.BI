@@ -23,24 +23,31 @@ public class ClickHouseDataMartReader : IDataMartReader
     public async Task<IReadOnlyList<DailyPerformanceRecord>> GetDailyPerformanceAsync(CancellationToken ct)
     {
         const string sql = """
+            WITH ranked AS (
+                SELECT
+                    AssetKey,
+                    ClosePrice,
+                    ROW_NUMBER() OVER (PARTITION BY AssetKey ORDER BY DateKey DESC) AS rn
+                FROM dwh.FactQuotes
+            ),
+            pivoted AS (
+                SELECT
+                    AssetKey,
+                    maxIf(ClosePrice, rn = 1) AS LatestClose,
+                    maxIf(ClosePrice, rn = 2) AS PrevClose
+                FROM ranked
+                WHERE rn <= 2
+                GROUP BY AssetKey
+            )
             SELECT
                 a.Ticker,
                 a.Name,
                 a.AssetType,
-                fq.ClosePrice,
-                if(prev.ClosePrice = 0 OR prev.ClosePrice IS NULL, 0,
-                   round((fq.ClosePrice - prev.ClosePrice) / prev.ClosePrice * 100, 2)) AS ChangePercent
+                p.LatestClose AS ClosePrice,
+                if(p.PrevClose = 0 OR p.PrevClose IS NULL, 0,
+                   round((p.LatestClose - p.PrevClose) / p.PrevClose * 100, 2)) AS ChangePercent
             FROM dwh.DimAssets a
-            INNER JOIN (
-                SELECT AssetKey, ClosePrice, DateKey,
-                       ROW_NUMBER() OVER (PARTITION BY AssetKey ORDER BY DateKey DESC) AS rn
-                FROM dwh.FactQuotes
-            ) fq ON fq.AssetKey = a.AssetKey AND fq.rn = 1
-            LEFT JOIN (
-                SELECT AssetKey, ClosePrice, DateKey,
-                       ROW_NUMBER() OVER (PARTITION BY AssetKey ORDER BY DateKey DESC) AS rn
-                FROM dwh.FactQuotes
-            ) prev ON prev.AssetKey = a.AssetKey AND prev.rn = 2
+            INNER JOIN pivoted p ON p.AssetKey = a.AssetKey
             WHERE a.IsActive = 1
             ORDER BY a.Ticker
             """;
@@ -116,25 +123,32 @@ public class ClickHouseDataMartReader : IDataMartReader
     public async Task<IReadOnlyList<PortfolioSummaryRecord>> GetPortfolioSummaryAsync(CancellationToken ct)
     {
         const string sql = """
+            WITH ranked AS (
+                SELECT
+                    AssetKey,
+                    ClosePrice,
+                    ROW_NUMBER() OVER (PARTITION BY AssetKey ORDER BY DateKey DESC) AS rn
+                FROM dwh.FactQuotes
+            ),
+            pivoted AS (
+                SELECT
+                    AssetKey,
+                    maxIf(ClosePrice, rn = 1) AS LatestClose,
+                    maxIf(ClosePrice, rn = 2) AS PrevClose
+                FROM ranked
+                WHERE rn <= 2
+                GROUP BY AssetKey
+            )
             SELECT
                 a.Ticker,
                 a.Name,
                 a.AssetType,
-                fq.ClosePrice AS LastClose,
-                if(prev.ClosePrice IS NULL, 0, prev.ClosePrice) AS PreviousClose,
-                if(prev.ClosePrice = 0 OR prev.ClosePrice IS NULL, 0,
-                   round((fq.ClosePrice - prev.ClosePrice) / prev.ClosePrice * 100, 2)) AS ChangePercent
+                p.LatestClose AS LastClose,
+                if(p.PrevClose IS NULL, 0, p.PrevClose) AS PreviousClose,
+                if(p.PrevClose = 0 OR p.PrevClose IS NULL, 0,
+                   round((p.LatestClose - p.PrevClose) / p.PrevClose * 100, 2)) AS ChangePercent
             FROM dwh.DimAssets a
-            INNER JOIN (
-                SELECT AssetKey, ClosePrice, DateKey,
-                       ROW_NUMBER() OVER (PARTITION BY AssetKey ORDER BY DateKey DESC) AS rn
-                FROM dwh.FactQuotes
-            ) fq ON fq.AssetKey = a.AssetKey AND fq.rn = 1
-            LEFT JOIN (
-                SELECT AssetKey, ClosePrice, DateKey,
-                       ROW_NUMBER() OVER (PARTITION BY AssetKey ORDER BY DateKey DESC) AS rn
-                FROM dwh.FactQuotes
-            ) prev ON prev.AssetKey = a.AssetKey AND prev.rn = 2
+            INNER JOIN pivoted p ON p.AssetKey = a.AssetKey
             WHERE a.IsActive = 1
             ORDER BY a.Ticker
             """;
