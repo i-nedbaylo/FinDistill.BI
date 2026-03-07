@@ -6,10 +6,12 @@ namespace FinDistill.Web.Controllers;
 public class SyncController : Controller
 {
     private readonly IEtlOrchestrator _etlOrchestrator;
+    private readonly ILogger<SyncController> _logger;
 
-    public SyncController(IEtlOrchestrator etlOrchestrator)
+    public SyncController(IEtlOrchestrator etlOrchestrator, ILogger<SyncController> logger)
     {
         _etlOrchestrator = etlOrchestrator;
+        _logger = logger;
     }
 
     [HttpPost]
@@ -27,7 +29,8 @@ public class SyncController : Controller
             }
             else
             {
-                TempData["SyncMessage"] = $"Sync failed: {result.Error.Message}";
+                _logger.LogWarning("Sync failed with error {ErrorCode}: {ErrorMessage}", result.Error.Code, result.Error.Message);
+                TempData["SyncMessage"] = $"Sync failed ({result.Error.Code}). Check logs for details.";
                 TempData["SyncStatus"] = "danger";
             }
         }
