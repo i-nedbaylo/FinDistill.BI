@@ -124,6 +124,10 @@ public class LoaderService : ILoaderService
 
             return Result.Success();
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "ETL Load failed with unhandled exception");

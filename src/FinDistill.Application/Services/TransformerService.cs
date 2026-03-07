@@ -59,6 +59,10 @@ public class TransformerService : ITransformerService
 
             return Result.Success<IReadOnlyList<ParsedQuoteDto>>(results);
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "ETL Transform failed with unhandled exception");

@@ -55,6 +55,10 @@ public class DashboardService : IDashboardService
             await _cache.SetAsync(cacheKey, dtos, DefaultCacheTtl, ct);
             return Result.Success<IReadOnlyList<DailyPerformanceDto>>(dtos);
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to get daily performance data");
@@ -91,6 +95,10 @@ public class DashboardService : IDashboardService
             await _cache.SetAsync(cacheKey, dtos, DefaultCacheTtl, ct);
             return Result.Success<IReadOnlyList<AssetHistoryDto>>(dtos);
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to get asset history for {Ticker}", ticker);
@@ -126,6 +134,10 @@ public class DashboardService : IDashboardService
 
             await _cache.SetAsync(cacheKey, dtos, DefaultCacheTtl, ct);
             return Result.Success<IReadOnlyList<PortfolioSummaryDto>>(dtos);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
