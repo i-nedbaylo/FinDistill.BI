@@ -2,7 +2,9 @@ using System.Net;
 using System.Text.Json;
 using FinDistill.Domain.Enums;
 using FinDistill.Domain.Interfaces;
+using FinDistill.Infrastructure.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace FinDistill.Infrastructure.Providers;
 
@@ -15,13 +17,18 @@ public class YahooFinanceProvider : IMarketDataProvider
 {
     private readonly HttpClient _httpClient;
     private readonly ILogger<YahooFinanceProvider> _logger;
+    private readonly YahooFinanceOptions _options;
 
     private const string BaseUrl = "https://query1.finance.yahoo.com/v8/finance/chart";
 
-    public YahooFinanceProvider(HttpClient httpClient, ILogger<YahooFinanceProvider> logger)
+    public YahooFinanceProvider(
+        HttpClient httpClient,
+        ILogger<YahooFinanceProvider> logger,
+        IOptions<DataSourcesOptions> options)
     {
         _httpClient = httpClient;
         _logger = logger;
+        _options = options.Value.YahooFinance;
     }
 
     public DataSourceType SourceType => DataSourceType.YahooFinance;
@@ -41,9 +48,11 @@ public class YahooFinanceProvider : IMarketDataProvider
     public async Task<IEnumerable<string>> FetchBulkDataAsync(IEnumerable<string> tickers, CancellationToken ct)
     {
         var results = new List<string>();
+        var tickerList = tickers.ToList();
 
-        foreach (var ticker in tickers)
+        for (var i = 0; i < tickerList.Count; i++)
         {
+            var ticker = tickerList[i];
             try
             {
                 var result = await FetchRawDataAsync(ticker, ct);
@@ -52,6 +61,12 @@ public class YahooFinanceProvider : IMarketDataProvider
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Yahoo Finance: failed to fetch {Ticker}, skipping", ticker);
+            }
+
+            // Throttle requests to avoid 429, skip delay after the last ticker
+            if (i < tickerList.Count - 1 && _options.RequestDelayMs > 0)
+            {
+                await Task.Delay(_options.RequestDelayMs, ct);
             }
         }
 
