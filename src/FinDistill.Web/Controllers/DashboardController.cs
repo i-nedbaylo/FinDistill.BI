@@ -7,10 +7,12 @@ namespace FinDistill.Web.Controllers;
 public class DashboardController : Controller
 {
     private readonly IDashboardService _dashboardService;
+    private readonly ILogger<DashboardController> _logger;
 
-    public DashboardController(IDashboardService dashboardService)
+    public DashboardController(IDashboardService dashboardService, ILogger<DashboardController> logger)
     {
         _dashboardService = dashboardService;
+        _logger = logger;
     }
 
     public async Task<IActionResult> Index(CancellationToken ct)
@@ -19,7 +21,9 @@ public class DashboardController : Controller
 
         if (portfolioResult.IsFailure)
         {
-            TempData["ErrorMessage"] = portfolioResult.Error.Message;
+            _logger.LogWarning("Dashboard failed to load portfolio: {ErrorCode}: {ErrorMessage}",
+                portfolioResult.Error.Code, portfolioResult.Error.Message);
+            TempData["ErrorMessage"] = "Failed to load portfolio data. Check logs for details.";
             return View(new DashboardViewModel());
         }
 
