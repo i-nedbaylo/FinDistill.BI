@@ -9,7 +9,7 @@ namespace FinDistill.Infrastructure.Providers;
 /// <summary>
 /// Market data provider for Yahoo Finance.
 /// Uses Yahoo Finance v8 API for historical quotes.
-/// Implements exponential backoff for HTTP 429 responses.
+/// Retry logic is handled by RetryDelegatingHandler in the HTTP pipeline.
 /// </summary>
 public class YahooFinanceProvider : IMarketDataProvider
 {
@@ -17,7 +17,6 @@ public class YahooFinanceProvider : IMarketDataProvider
     private readonly ILogger<YahooFinanceProvider> _logger;
 
     private const string BaseUrl = "https://query1.finance.yahoo.com/v8/finance/chart";
-    private const int MaxRetries = 3;
 
     public YahooFinanceProvider(HttpClient httpClient, ILogger<YahooFinanceProvider> logger)
     {
@@ -32,39 +31,11 @@ public class YahooFinanceProvider : IMarketDataProvider
         var encodedTicker = Uri.EscapeDataString(ticker);
         var url = $"{BaseUrl}/{encodedTicker}?range=5d&interval=1d";
 
-        for (var attempt = 0; attempt < MaxRetries + 1; attempt++)
-        {
-            try
-            {
-                var response = await _httpClient.GetAsync(url, ct);
+        var response = await _httpClient.GetAsync(url, ct);
+        response.EnsureSuccessStatusCode();
+        var rawJson = await response.Content.ReadAsStringAsync(ct);
 
-                if (response.StatusCode == HttpStatusCode.TooManyRequests)
-                {
-                    if (attempt < MaxRetries)
-                    {
-                        var delay = TimeSpan.FromSeconds(Math.Pow(2, attempt + 1));
-                        _logger.LogWarning("Yahoo Finance rate limited for {Ticker}, retrying in {Delay}s (attempt {Attempt}/{MaxRetries})",
-                            ticker, delay.TotalSeconds, attempt + 1, MaxRetries);
-                        await Task.Delay(delay, ct);
-                        continue;
-                    }
-                    break;
-                }
-
-                response.EnsureSuccessStatusCode();
-                var rawJson = await response.Content.ReadAsStringAsync(ct);
-
-                return ConvertToStandardFormat(rawJson, ticker);
-            }
-            catch (HttpRequestException ex) when (attempt < MaxRetries)
-            {
-                var delay = TimeSpan.FromSeconds(Math.Pow(2, attempt + 1));
-                _logger.LogWarning(ex, "Yahoo Finance request failed for {Ticker}, retrying in {Delay}s", ticker, delay.TotalSeconds);
-                await Task.Delay(delay, ct);
-            }
-        }
-
-        throw new InvalidOperationException($"Failed to fetch data from Yahoo Finance for {ticker} after {MaxRetries} retries.");
+        return ConvertToStandardFormat(rawJson, ticker);
     }
 
     public async Task<IEnumerable<string>> FetchBulkDataAsync(IEnumerable<string> tickers, CancellationToken ct)

@@ -201,17 +201,15 @@
   - Serilog.Sinks.Console 5.0.0
   - Serilog.Sinks.File 5.0.0
   - Serilog.Settings.Configuration 8.0.4
-  - Microsoft.Extensions.Hosting.WindowsServices 8.0.1
 - [✅] **7.2** Настроить `Program.cs`:
   - Serilog bootstrap + AddSerilog (Console + File, rolling daily)
   - `builder.Services.AddInfrastructure(configuration)`
   - `builder.Services.AddApplicationServices()`
   - `builder.Services.AddHostedService<EtlWorker>()`
-  - Выбор режима хостинга по `HostingMode`: Console (default) / WindowsService / Docker
 - [✅] **7.3** Настроить `appsettings.json`:
   - ConnectionStrings:DefaultConnection, Database:Provider
   - EtlSchedule (IntervalMinutes=15, CronExpression=null)
-  - DataSources, HostingMode, Serilog
+  - DataSources, Serilog
 - [✅] **7.4** Создать `EtlWorker.cs : BackgroundService`:
   - IServiceScopeFactory для scoped IEtlOrchestrator
   - IOptions<EtlScheduleOptions> для расписания
@@ -219,38 +217,6 @@
   - Structured logging через Serilog
 - [✅] **7.5** Создать `Configuration/EtlScheduleOptions.cs`
 - [✅] **7.6** Собрать проект, убедиться что нет ошибок
-
----
-
-## Фаза 7.5. Docker-поддержка
-
-- [ ] **7.5.1** Создать `src/FinDistill.Worker/Dockerfile`:
-  - Multi-stage build (SDK → Runtime)
-  - Base image: `mcr.microsoft.com/dotnet/runtime:8.0` (Worker не нуждается в ASP.NET)
-  - Копирование всех проектов для restore (Domain, Application, Infrastructure, Worker)
-  - `ENTRYPOINT ["dotnet", "FinDistill.Worker.dll"]`
-- [ ] **7.5.2** Создать `src/FinDistill.Web/Dockerfile`:
-  - Multi-stage build (SDK → Runtime)
-  - Base image: `mcr.microsoft.com/dotnet/aspnet:8.0`
-  - `EXPOSE 8080`
-  - `ENTRYPOINT ["dotnet", "FinDistill.Web.dll"]`
-- [ ] **7.5.3** Создать `docker-compose.yml` в корне решения:
-  - Сервис `web` — собирается из `src/FinDistill.Web/Dockerfile`
-  - Сервис `worker` — собирается из `src/FinDistill.Worker/Dockerfile`
-  - Сервис `db-sqlserver` — профиль `sqlserver` (mcr.microsoft.com/mssql/server:2022-latest)
-  - Сервис `db-postgres` — профиль `postgres` (postgres:16)
-  - Сервис `redis` — профиль `redis` (redis:7-alpine), опциональный
-  - Сервис `clickhouse` — профиль `clickhouse` (clickhouse/clickhouse-server:latest), опциональный
-  - Переменные окружения: `ConnectionStrings__DefaultConnection`, `Database__Provider`, `Features__UseRedis`, `Features__UseClickHouse`, `HostingMode=Docker`
-  - Volumes для персистентного хранения БД
-  - depends_on: web → db, worker → db
-- [ ] **7.5.4** Создать `docker-compose.override.yml` с development-настройками:
-  - Порты для отладки
-  - Переменные окружения для development
-- [ ] **7.5.5** Создать `.dockerignore` в корне решения:
-  - bin/, obj/, .git/, .vs/, *.user, .github/
-- [ ] **7.5.6** Проверить `docker-compose build` — образы собираются без ошибок
-- [ ] **7.5.7** Проверить `docker-compose up` — все сервисы стартуют, Worker подключается к БД
 
 ---
 
@@ -294,21 +260,22 @@
 
 > Исправления выявленные при комплексном аудите кода (post Phase 9).
 
-- [ ] **9.5.1** 🔴 Исправить `ExtractorService`: передавать тикеры из `DataSources` конфигурации
-  - Создать `Configuration/DataSourcesOptions.cs` в Infrastructure
-  - Внедрить `IOptions<DataSourcesOptions>` в `ExtractorService`
-  - Передавать тикеры в `FetchBulkDataAsync` по `SourceType`
-- [ ] **9.5.2** 🟡 Исправить `LoaderService`: `AssetType = "YahooFinance"` → реальный тип (Stock/ETF/Crypto)
-  - Определять тип актива по `DataSourceType`: CoinGecko → Crypto, YahooFinance → Stock (по умолчанию)
-- [ ] **9.5.3** 🟡 Оптимизировать `LoaderService`: устранить N+1 запросы
-  - Кэшировать dimension lookups в памяти внутри одного вызова `LoadAsync`
-  - Один `SaveChangesAsync` для batch фактов
-  - Обернуть в транзакцию
-- [ ] **9.5.4** 🟡 Вынести retry-логику в `RetryDelegatingHandler`
-  - Создать `Infrastructure/Http/RetryDelegatingHandler.cs`
-  - Зарегистрировать через `AddHttpMessageHandler` в DI
-  - Убрать дублированный retry-код из обоих провайдеров
-- [ ] **9.5.5** Собрать проект, убедиться что нет ошибок
+- [✅] **9.5.1** 🔴 Исправить `ExtractorService`: передавать тикеры из `DataSources` конфигурации
+  - Создан `Configuration/DataSourcesOptions.cs` в Infrastructure
+  - Создан `Interfaces/ITickerProvider.cs` в Application (абстракция)
+  - Создан `Providers/ConfigTickerProvider.cs` в Infrastructure (реализация)
+  - `ExtractorService` использует `ITickerProvider` для получения тикеров по `SourceType`
+  - Добавлен `AddRangeAsync` в `IRawIngestDataRepository` для batch-сохранения
+- [✅] **9.5.2** 🟡 Исправить `LoaderService`: `AssetType = "YahooFinance"` → реальный тип
+  - Метод `ResolveAssetType`: CoinGecko → "Crypto", YahooFinance → "Stock"
+- [✅] **9.5.3** 🟡 Оптимизировать `LoaderService`: устранить N+1 запросы
+  - In-memory кэш для dimensions (asset/date/source) внутри batch
+  - Один `AddRangeAsync` для всех фактов в конце
+- [✅] **9.5.4** 🟡 Вынести retry-логику в `RetryDelegatingHandler`
+  - Создан `Infrastructure/Http/RetryDelegatingHandler.cs`
+  - Зарегистрирован через `AddHttpMessageHandler` для обоих провайдеров
+  - Удалён дублированный retry-код из `YahooFinanceProvider` и `CoinGeckoProvider`
+- [✅] **9.5.5** Собрать проект, убедиться что нет ошибок
 
 ---
 
@@ -325,8 +292,7 @@
 - [ ] **10.4** Обновить `AddInfrastructure`: при `Features:UseRedis = true` → регистрировать `RedisCacheService` вместо `NullCacheService`
 - [ ] **10.5** Обновить `DashboardService` — добавить cache-aside логику:
   - `GetAsync` → cache hit → return; cache miss → `IDataMartReader` → `SetAsync` → return
-- [ ] **10.6** Добавить Redis в `docker-compose.yml` (профиль `redis`)
-- [ ] **10.7** Проверить работу с Redis включённым и выключенным
+- [ ] **10.6** Проверить работу с Redis включённым и выключенным
 
 ---
 
@@ -334,7 +300,7 @@
 
 > Реализуется только после базового функционала (Фазы 0–9). Интерфейс `IDataMartReader` уже заложен в Фазе 1.
 
-- [ ] **11.1** Добавить NuGet-пакет `ClickHouse.Client` в FinDistill.Infrastructure
+- [ ] **11.1** Добавить NuGet-пакет `ClickHouse.Client` в FinDistIll.Infrastructure
 - [ ] **11.2** Создать класс настроек `Configuration/ClickHouseOptions.cs`:
   - ConnectionString (из ConnectionStrings:ClickHouse)
 - [ ] **11.3** Реализовать `DataMarts/ClickHouseDataMartReader.cs : IDataMartReader`:
@@ -346,5 +312,4 @@
 - [ ] **11.5** Создать DDL-скрипты для таблиц ClickHouse (MergeTree engine)
 - [ ] **11.6** Обновить `AddInfrastructure`: при `Features:UseClickHouse = true` → регистрировать `ClickHouseDataMartReader` вместо `DapperDataMartReader`
 - [ ] **11.7** Обновить `EtlOrchestrator` — вызывать `ClickHouseSyncService` после Load (при включённом флаге)
-- [ ] **11.8** Добавить ClickHouse в `docker-compose.yml` (профиль `clickhouse`)
-- [ ] **11.9** Проверить работу с ClickHouse включённым и выключенным
+- [ ] **11.8** Проверить работу с ClickHouse включённым и выключенным

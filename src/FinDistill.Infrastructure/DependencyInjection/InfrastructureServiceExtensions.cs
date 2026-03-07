@@ -1,7 +1,9 @@
+using FinDistill.Application.Interfaces;
 using FinDistill.Domain.Interfaces;
 using FinDistill.Infrastructure.Caching;
 using FinDistill.Infrastructure.Configuration;
 using FinDistill.Infrastructure.DataMarts;
+using FinDistill.Infrastructure.Http;
 using FinDistill.Infrastructure.Persistence;
 using FinDistill.Infrastructure.Providers;
 using FinDistill.Infrastructure.Repositories;
@@ -21,6 +23,7 @@ public static class InfrastructureServiceExtensions
         // Options
         services.Configure<DatabaseOptions>(configuration.GetSection(DatabaseOptions.SectionName));
         services.Configure<FeaturesOptions>(configuration.GetSection(FeaturesOptions.SectionName));
+        services.Configure<DataSourcesOptions>(configuration.GetSection(DataSourcesOptions.SectionName));
 
         var dbOptions = new DatabaseOptions();
         configuration.GetSection(DatabaseOptions.SectionName).Bind(dbOptions);
@@ -66,11 +69,19 @@ public static class InfrastructureServiceExtensions
         // Default: NullCacheService (no-op). Redis support will be added in Phase 10.
         services.AddSingleton<ICacheService, NullCacheService>();
 
+        // Retry handler for HTTP clients
+        services.AddTransient<RetryDelegatingHandler>();
+
         // API providers (registered as IMarketDataProvider for IEnumerable<IMarketDataProvider> injection)
-        services.AddHttpClient<YahooFinanceProvider>();
-        services.AddHttpClient<CoinGeckoProvider>();
+        services.AddHttpClient<YahooFinanceProvider>()
+            .AddHttpMessageHandler<RetryDelegatingHandler>();
+        services.AddHttpClient<CoinGeckoProvider>()
+            .AddHttpMessageHandler<RetryDelegatingHandler>();
         services.AddScoped<IMarketDataProvider, YahooFinanceProvider>();
         services.AddScoped<IMarketDataProvider, CoinGeckoProvider>();
+
+        // Ticker provider (reads DataSources config)
+        services.AddSingleton<ITickerProvider, ConfigTickerProvider>();
 
         return services;
     }
