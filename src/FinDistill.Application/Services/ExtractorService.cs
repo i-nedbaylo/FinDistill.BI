@@ -75,6 +75,10 @@ public class ExtractorService : IExtractorService
 
                 _logger.LogInformation("ETL Extract completed for {Source}, records saved: {Count}", sourceName, records.Count);
             }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "ETL Extract failed for {Source}", sourceName);

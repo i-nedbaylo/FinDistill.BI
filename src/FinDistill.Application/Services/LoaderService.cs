@@ -107,6 +107,10 @@ public class LoaderService : ILoaderService
                         LoadedAt = DateTime.UtcNow
                     });
                 }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
                 catch (Exception ex)
                 {
                     _logger.LogWarning(ex, "ETL Load failed for ticker {Ticker} on {Date}", dto.Ticker, dto.Date);
