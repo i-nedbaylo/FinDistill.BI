@@ -15,11 +15,17 @@ public class DashboardController : Controller
 
     public async Task<IActionResult> Index(CancellationToken ct)
     {
-        var portfolio = await _dashboardService.GetPortfolioSummaryAsync(ct);
+        var portfolioResult = await _dashboardService.GetPortfolioSummaryAsync(ct);
+
+        if (portfolioResult.IsFailure)
+        {
+            TempData["ErrorMessage"] = portfolioResult.Error.Message;
+            return View(new DashboardViewModel());
+        }
 
         var viewModel = new DashboardViewModel
         {
-            PortfolioSummary = portfolio
+            PortfolioSummary = portfolioResult.Value
         };
 
         return View(viewModel);

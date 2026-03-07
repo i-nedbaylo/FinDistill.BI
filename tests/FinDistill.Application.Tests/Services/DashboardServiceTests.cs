@@ -30,8 +30,9 @@ public class DashboardServiceTests
         var sut = CreateSut();
         var result = await sut.GetPortfolioSummaryAsync(CancellationToken.None);
 
-        Assert.Single(result);
-        Assert.Equal("AAPL", result[0].Ticker);
+        Assert.True(result.IsSuccess);
+        Assert.Single(result.Value);
+        Assert.Equal("AAPL", result.Value[0].Ticker);
         _martReaderMock.Verify(m => m.GetPortfolioSummaryAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -50,7 +51,8 @@ public class DashboardServiceTests
         var sut = CreateSut();
         var result = await sut.GetAssetHistoryAsync("AAPL", 30, CancellationToken.None);
 
-        Assert.Single(result);
+        Assert.True(result.IsSuccess);
+        Assert.Single(result.Value);
         _martReaderMock.Verify(m => m.GetAssetHistoryAsync("AAPL", 30, It.IsAny<CancellationToken>()), Times.Once);
     }
 }

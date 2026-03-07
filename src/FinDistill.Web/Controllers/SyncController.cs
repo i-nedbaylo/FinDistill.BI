@@ -18,9 +18,18 @@ public class SyncController : Controller
     {
         try
         {
-            await _etlOrchestrator.RunEtlPipelineAsync(ct);
-            TempData["SyncMessage"] = "Sync completed successfully.";
-            TempData["SyncStatus"] = "success";
+            var result = await _etlOrchestrator.RunEtlPipelineAsync(ct);
+
+            if (result.IsSuccess)
+            {
+                TempData["SyncMessage"] = "Sync completed successfully.";
+                TempData["SyncStatus"] = "success";
+            }
+            else
+            {
+                TempData["SyncMessage"] = $"Sync failed: {result.Error.Message}";
+                TempData["SyncStatus"] = "danger";
+            }
         }
         catch (OperationCanceledException)
         {

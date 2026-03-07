@@ -20,9 +20,12 @@ public class AssetController : Controller
 
         var clampedDays = Math.Clamp(days, 1, 365);
 
-        var history = await _dashboardService.GetAssetHistoryAsync(ticker, clampedDays, ct);
-        var portfolio = await _dashboardService.GetPortfolioSummaryAsync(ct);
-        var asset = portfolio.FirstOrDefault(p => p.Ticker == ticker);
+        var historyResult = await _dashboardService.GetAssetHistoryAsync(ticker, clampedDays, ct);
+        var portfolioResult = await _dashboardService.GetPortfolioSummaryAsync(ct);
+
+        var asset = portfolioResult.IsSuccess
+            ? portfolioResult.Value.FirstOrDefault(p => p.Ticker == ticker)
+            : null;
 
         var viewModel = new AssetDetailViewModel
         {
@@ -31,7 +34,7 @@ public class AssetController : Controller
             AssetType = asset?.AssetType ?? string.Empty,
             LastClose = asset?.LastClose ?? 0,
             ChangePercent = asset?.ChangePercent ?? 0,
-            History = history
+            History = historyResult.IsSuccess ? historyResult.Value : []
         };
 
         return View(viewModel);

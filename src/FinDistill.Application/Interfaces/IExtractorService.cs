@@ -1,3 +1,5 @@
+using FinDistill.Domain.Common;
+
 namespace FinDistill.Application.Interfaces;
 
 /// <summary>
@@ -5,5 +7,5 @@ namespace FinDistill.Application.Interfaces;
 /// </summary>
 public interface IExtractorService
 {
-    Task ExtractAsync(CancellationToken ct);
+    Task<Result> ExtractAsync(CancellationToken ct);
 }

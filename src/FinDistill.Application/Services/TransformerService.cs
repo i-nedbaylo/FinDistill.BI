@@ -1,6 +1,7 @@
 using System.Text.Json;
 using FinDistill.Application.DTOs;
 using FinDistill.Application.Interfaces;
+using FinDistill.Domain.Common;
 using FinDistill.Domain.Enums;
 using FinDistill.Domain.Interfaces;
 using Microsoft.Extensions.Logging;
@@ -24,37 +25,46 @@ public class TransformerService : ITransformerService
         _logger = logger;
     }
 
-    public async Task<IReadOnlyList<ParsedQuoteDto>> TransformAsync(CancellationToken ct)
+    public async Task<Result<IReadOnlyList<ParsedQuoteDto>>> TransformAsync(CancellationToken ct)
     {
-        var unprocessed = await _rawRepo.GetUnprocessedAsync(ct);
-        _logger.LogInformation("ETL Transform started, unprocessed records: {Count}", unprocessed.Count);
-
-        var results = new List<ParsedQuoteDto>();
-        var processedIds = new List<long>();
-
-        foreach (var record in unprocessed)
+        try
         {
-            try
-            {
-                var parsed = ParseRecord(record);
-                results.AddRange(parsed);
-                processedIds.Add(record.Id);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "ETL Transform skipped invalid record {RecordId} from {Source}", record.Id, record.Source);
-            }
-        }
+            var unprocessed = await _rawRepo.GetUnprocessedAsync(ct);
+            _logger.LogInformation("ETL Transform started, unprocessed records: {Count}", unprocessed.Count);
 
-        if (processedIds.Count > 0)
+            var results = new List<ParsedQuoteDto>();
+            var processedIds = new List<long>();
+
+            foreach (var record in unprocessed)
+            {
+                try
+                {
+                    var parsed = ParseRecord(record);
+                    results.AddRange(parsed);
+                    processedIds.Add(record.Id);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "ETL Transform skipped invalid record {RecordId} from {Source}", record.Id, record.Source);
+                }
+            }
+
+            if (processedIds.Count > 0)
+            {
+                await _rawRepo.MarkAsProcessedAsync(processedIds, ct);
+            }
+
+            _logger.LogInformation("ETL Transform completed, parsed quotes: {Count}, processed records: {Processed}",
+                results.Count, processedIds.Count);
+
+            return Result.Success<IReadOnlyList<ParsedQuoteDto>>(results);
+        }
+        catch (Exception ex)
         {
-            await _rawRepo.MarkAsProcessedAsync(processedIds, ct);
+            _logger.LogError(ex, "ETL Transform failed with unhandled exception");
+            return Result.Failure<IReadOnlyList<ParsedQuoteDto>>(
+                new Error("Transform.Failed", ex.Message));
         }
-
-        _logger.LogInformation("ETL Transform completed, parsed quotes: {Count}, processed records: {Processed}",
-            results.Count, processedIds.Count);
-
-        return results;
     }
 
     private static List<ParsedQuoteDto> ParseRecord(Domain.Entities.RawIngestData record)

@@ -330,25 +330,27 @@
 > Замена механизма обработки ошибок: вместо try/catch + возврат null → явный `Result<T>` / `Result` тип.
 > Повышает читаемость, тестируемость и вытесняет исключения из flow-control.
 
-- [ ] **12.1** Создать `Result<T>` и `Result` типы в Domain:
-  - `Domain/Common/Result.cs` — `IsSuccess`, `IsFailure`, `Error`
-  - `Domain/Common/Result{T}.cs` — generic-версия с `Value`
-  - `Domain/Common/Error.cs` — `Code`, `Message` (value object)
+- [✅] **12.1** Создать `Result<T>` и `Result` типы в Domain:
+  - `Domain/Common/Result.cs` — `IsSuccess`, `IsFailure`, `Error`, generic `Result<T>` с `Value`
+  - `Domain/Common/Error.cs` — `Code`, `Message` (sealed record)
   - Immutable, без исключений в конструкторе
-- [ ] **12.2** Рефакторинг ETL-сервисов (Application):
-  - `ExtractorService.ExtractAsync` → `Task<Result>`
+- [✅] **12.2** Рефакторинг ETL-сервисов (Application):
+  - `ExtractorService.ExtractAsync` → `Task<Result>` (PartialFailure при ошибке провайдера)
   - `TransformerService.TransformAsync` → `Task<Result<IReadOnlyList<ParsedQuoteDto>>>`
-  - `LoaderService.LoadAsync` → `Task<Result>`
-  - `EtlOrchestrator.RunEtlPipelineAsync` → проверяет `result.IsFailure`, логирует `result.Error`
-- [ ] **12.3** Рефакторинг DashboardService:
+  - `LoaderService.LoadAsync` → `Task<Result>` (try/catch → Failure)
+  - `EtlOrchestrator.RunEtlPipelineAsync` → `Task<Result>`, проверяет `result.IsFailure`, логирует `result.Error`
+- [✅] **12.3** Рефакторинг DashboardService:
   - `GetDailyPerformanceAsync` → `Task<Result<IReadOnlyList<DailyPerformanceDto>>>`
-  - Контроллеры: pattern match по `result.IsSuccess` → View / Error page
-- [ ] **12.4** Рефакторинг Repository-методов (Domain interfaces):
-  - `UpsertAsync` → `Task<Result<DimAsset>>`
-  - `ExistsAsync` → оставить `Task<bool>` (не нуждается в Result)
-- [ ] **12.5** Обновить unit-тесты:
-  - Assert на `result.IsSuccess` / `result.IsFailure` / `result.Error.Code`
-- [ ] **12.6** Собрать проект, все тесты зелёные
+  - `GetAssetHistoryAsync` → `Task<Result<IReadOnlyList<AssetHistoryDto>>>`
+  - `GetPortfolioSummaryAsync` → `Task<Result<IReadOnlyList<PortfolioSummaryDto>>>`
+  - Контроллеры: pattern match по `result.IsSuccess` → View / fallback empty
+- [✅] **12.4** Рефакторинг Repository-методов (Domain interfaces):
+  - Решено **не менять** — `UpsertAsync`, `ExistsAsync` оставлены без Result (репозитории бросают исключения, ловятся в ETL-сервисах)
+- [✅] **12.5** Обновить unit-тесты:
+  - Assert на `result.IsSuccess` / `result.IsFailure` / `result.Error.Code` / `result.Value`
+  - Добавлен новый тест `RunEtlPipelineAsync_TransformFailure_ReturnsFailure`
+  - Добавлен новый тест `ExtractAsync_ProviderThrows_ReturnsPartialFailure`
+- [✅] **12.6** Собрать проект, все тесты зелёные: build 0 errors, 34 tests pass
 
 ---
 

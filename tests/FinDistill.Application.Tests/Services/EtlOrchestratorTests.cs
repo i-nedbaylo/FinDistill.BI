@@ -1,6 +1,7 @@
 using FinDistill.Application.DTOs;
 using FinDistill.Application.Interfaces;
 using FinDistill.Application.Services;
+using FinDistill.Domain.Common;
 using Microsoft.Extensions.Logging;
 using Moq;
 
@@ -23,29 +24,33 @@ public class EtlOrchestratorTests
 
         _extractorMock.Setup(e => e.ExtractAsync(It.IsAny<CancellationToken>()))
             .Callback(() => callOrder.Add("Extract"))
-            .Returns(Task.CompletedTask);
+            .ReturnsAsync(Result.Success());
         _transformerMock.Setup(t => t.TransformAsync(It.IsAny<CancellationToken>()))
             .Callback(() => callOrder.Add("Transform"))
-            .ReturnsAsync(new List<ParsedQuoteDto> { new() });
+            .ReturnsAsync(Result.Success<IReadOnlyList<ParsedQuoteDto>>(new List<ParsedQuoteDto> { new() }));
         _loaderMock.Setup(l => l.LoadAsync(It.IsAny<IEnumerable<ParsedQuoteDto>>(), It.IsAny<CancellationToken>()))
             .Callback(() => callOrder.Add("Load"))
-            .Returns(Task.CompletedTask);
+            .ReturnsAsync(Result.Success());
 
         var sut = CreateSut();
-        await sut.RunEtlPipelineAsync(CancellationToken.None);
+        var result = await sut.RunEtlPipelineAsync(CancellationToken.None);
 
+        Assert.True(result.IsSuccess);
         Assert.Equal(["Extract", "Transform", "Load"], callOrder);
     }
 
     [Fact]
     public async Task RunEtlPipelineAsync_NoData_SkipsLoad()
     {
+        _extractorMock.Setup(e => e.ExtractAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success());
         _transformerMock.Setup(t => t.TransformAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<ParsedQuoteDto>());
+            .ReturnsAsync(Result.Success<IReadOnlyList<ParsedQuoteDto>>(new List<ParsedQuoteDto>()));
 
         var sut = CreateSut();
-        await sut.RunEtlPipelineAsync(CancellationToken.None);
+        var result = await sut.RunEtlPipelineAsync(CancellationToken.None);
 
+        Assert.True(result.IsSuccess);
         _loaderMock.Verify(l => l.LoadAsync(
             It.IsAny<IEnumerable<ParsedQuoteDto>>(), It.IsAny<CancellationToken>()), Times.Never);
     }
@@ -63,14 +68,32 @@ public class EtlOrchestratorTests
     }
 
     [Fact]
-    public async Task RunEtlPipelineAsync_GenericException_DoesNotRethrow()
+    public async Task RunEtlPipelineAsync_GenericException_ReturnsFailure()
     {
         _extractorMock.Setup(e => e.ExtractAsync(It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("Test error"));
 
         var sut = CreateSut();
+        var result = await sut.RunEtlPipelineAsync(CancellationToken.None);
 
-        // Should not throw — exception is caught and logged
-        await sut.RunEtlPipelineAsync(CancellationToken.None);
+        Assert.True(result.IsFailure);
+        Assert.Equal("Etl.UnhandledException", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task RunEtlPipelineAsync_TransformFailure_ReturnsFailure()
+    {
+        _extractorMock.Setup(e => e.ExtractAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success());
+        _transformerMock.Setup(t => t.TransformAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Failure<IReadOnlyList<ParsedQuoteDto>>(new Error("Transform.Failed", "test")));
+
+        var sut = CreateSut();
+        var result = await sut.RunEtlPipelineAsync(CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Transform.Failed", result.Error.Code);
+        _loaderMock.Verify(l => l.LoadAsync(
+            It.IsAny<IEnumerable<ParsedQuoteDto>>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 }

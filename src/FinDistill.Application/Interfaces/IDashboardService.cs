@@ -1,4 +1,5 @@
 using FinDistill.Application.DTOs;
+using FinDistill.Domain.Common;
 
 namespace FinDistill.Application.Interfaces;
 
@@ -7,9 +8,9 @@ namespace FinDistill.Application.Interfaces;
 /// </summary>
 public interface IDashboardService
 {
-    Task<IReadOnlyList<DailyPerformanceDto>> GetDailyPerformanceAsync(CancellationToken ct);
+    Task<Result<IReadOnlyList<DailyPerformanceDto>>> GetDailyPerformanceAsync(CancellationToken ct);
 
-    Task<IReadOnlyList<AssetHistoryDto>> GetAssetHistoryAsync(string ticker, int days, CancellationToken ct);
+    Task<Result<IReadOnlyList<AssetHistoryDto>>> GetAssetHistoryAsync(string ticker, int days, CancellationToken ct);
 
-    Task<IReadOnlyList<PortfolioSummaryDto>> GetPortfolioSummaryAsync(CancellationToken ct);
+    Task<Result<IReadOnlyList<PortfolioSummaryDto>>> GetPortfolioSummaryAsync(CancellationToken ct);
 }

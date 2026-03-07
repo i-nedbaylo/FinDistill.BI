@@ -1,4 +1,5 @@
 using FinDistill.Application.DTOs;
+using FinDistill.Domain.Common;
 
 namespace FinDistill.Application.Interfaces;
 
@@ -8,5 +9,5 @@ namespace FinDistill.Application.Interfaces;
 /// </summary>
 public interface ITransformerService
 {
-    Task<IReadOnlyList<ParsedQuoteDto>> TransformAsync(CancellationToken ct);
+    Task<Result<IReadOnlyList<ParsedQuoteDto>>> TransformAsync(CancellationToken ct);
 }

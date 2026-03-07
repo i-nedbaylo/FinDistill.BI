@@ -1,4 +1,5 @@
 using FinDistill.Application.DTOs;
+using FinDistill.Domain.Common;
 
 namespace FinDistill.Application.Interfaces;
 
@@ -7,5 +8,5 @@ namespace FinDistill.Application.Interfaces;
 /// </summary>
 public interface ILoaderService
 {
-    Task LoadAsync(IEnumerable<ParsedQuoteDto> quotes, CancellationToken ct);
+    Task<Result> LoadAsync(IEnumerable<ParsedQuoteDto> quotes, CancellationToken ct);
 }

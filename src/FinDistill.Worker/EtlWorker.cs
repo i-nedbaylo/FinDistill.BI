@@ -47,8 +47,16 @@ public class EtlWorker : BackgroundService
                 var orchestrator = scope.ServiceProvider.GetRequiredService<IEtlOrchestrator>();
 
                 _logger.LogInformation("ETL Worker: starting pipeline run");
-                await orchestrator.RunEtlPipelineAsync(stoppingToken);
-                _logger.LogInformation("ETL Worker: pipeline run completed");
+                var result = await orchestrator.RunEtlPipelineAsync(stoppingToken);
+
+                if (result.IsSuccess)
+                {
+                    _logger.LogInformation("ETL Worker: pipeline run completed successfully");
+                }
+                else
+                {
+                    _logger.LogWarning("ETL Worker: pipeline run finished with error: {Error}", result.Error.Message);
+                }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
