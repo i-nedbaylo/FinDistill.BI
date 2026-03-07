@@ -19,13 +19,25 @@ public class RetryDelegatingHandler : DelegatingHandler
 
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
     {
+        // Pre-buffer content before retry loop so it can be replayed on each attempt.
+        // After base.SendAsync the original content stream is consumed and cannot be re-read.
+        byte[]? contentBytes = null;
+        string? contentType = null;
+        if (request.Content is not null)
+        {
+            contentBytes = await request.Content.ReadAsByteArrayAsync(ct);
+            contentType = request.Content.Headers.ContentType?.ToString();
+        }
+
         HttpResponseMessage? response = null;
 
         for (var attempt = 0; attempt <= MaxRetries; attempt++)
         {
+            var msg = attempt == 0 ? request : CloneRequest(request, contentBytes, contentType);
+
             try
             {
-                response = await base.SendAsync(attempt == 0 ? request : await CloneRequestAsync(request), ct);
+                response = await base.SendAsync(msg, ct);
 
                 if (response.StatusCode != HttpStatusCode.TooManyRequests || attempt == MaxRetries)
                     return response;
@@ -50,22 +62,18 @@ public class RetryDelegatingHandler : DelegatingHandler
         return response ?? await base.SendAsync(request, ct);
     }
 
-    private static async Task<HttpRequestMessage> CloneRequestAsync(HttpRequestMessage request)
+    private static HttpRequestMessage CloneRequest(HttpRequestMessage request, byte[]? contentBytes, string? contentType)
     {
         var clone = new HttpRequestMessage(request.Method, request.RequestUri)
         {
             Version = request.Version
         };
 
-        if (request.Content is not null)
+        if (contentBytes is not null)
         {
-            var ms = new MemoryStream();
-            await request.Content.CopyToAsync(ms);
-            ms.Position = 0;
-            clone.Content = new StreamContent(ms);
-
-            foreach (var header in request.Content.Headers)
-                clone.Content.Headers.TryAddWithoutValidation(header.Key, header.Value);
+            clone.Content = new ByteArrayContent(contentBytes);
+            if (contentType is not null)
+                clone.Content.Headers.TryAddWithoutValidation("Content-Type", contentType);
         }
 
         foreach (var header in request.Headers)
