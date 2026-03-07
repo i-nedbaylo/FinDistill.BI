@@ -3,6 +3,7 @@ using FinDistill.Infrastructure.Configuration;
 using FinDistill.Infrastructure.DataMarts;
 using FinDistill.Infrastructure.Persistence;
 using FinDistill.Infrastructure.Tests.Fixtures;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 
@@ -91,30 +92,36 @@ public class DapperDataMartReaderIntegrationTests
 
     private static async Task SeedTestDataAsync(FinDistillDbContext context)
     {
-        // Skip if already seeded
-        if (context.DimAssets.Any(a => a.Ticker == "INTG_AAPL"))
-            return;
-
-        var asset = new DimAsset
+        // Ensure asset exists (idempotent)
+        var asset = await context.DimAssets.SingleOrDefaultAsync(a => a.Ticker == "INTG_AAPL");
+        if (asset is null)
         {
-            Ticker = "INTG_AAPL",
-            Name = "Integration AAPL",
-            AssetType = "Stock",
-            IsActive = true,
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
-        };
-        context.DimAssets.Add(asset);
-        await context.SaveChangesAsync();
+            asset = new DimAsset
+            {
+                Ticker = "INTG_AAPL",
+                Name = "Integration AAPL",
+                AssetType = "Stock",
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+            context.DimAssets.Add(asset);
+            await context.SaveChangesAsync();
+        }
 
-        var source = new DimSource
+        // Ensure source exists (idempotent)
+        var source = await context.DimSources.SingleOrDefaultAsync(s => s.SourceName == "IntegrationTest");
+        if (source is null)
         {
-            SourceName = "IntegrationTest",
-            BaseUrl = "https://test.local",
-            IsActive = true
-        };
-        context.DimSources.Add(source);
-        await context.SaveChangesAsync();
+            source = new DimSource
+            {
+                SourceName = "IntegrationTest",
+                BaseUrl = "https://test.local",
+                IsActive = true
+            };
+            context.DimSources.Add(source);
+            await context.SaveChangesAsync();
+        }
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var yesterday = today.AddDays(-1);
@@ -145,8 +152,10 @@ public class DapperDataMartReaderIntegrationTests
         var yesterdayKey = yesterday.Year * 10000 + yesterday.Month * 100 + yesterday.Day;
         var todayKey = today.Year * 10000 + today.Month * 100 + today.Day;
 
-        context.FactQuotes.AddRange(
-            new FactQuote
+        // Ensure fact quotes exist (idempotent)
+        if (!await context.FactQuotes.AnyAsync(f => f.AssetKey == asset.AssetKey && f.DateKey == yesterdayKey && f.SourceKey == source.SourceKey))
+        {
+            context.FactQuotes.Add(new FactQuote
             {
                 AssetKey = asset.AssetKey,
                 DateKey = yesterdayKey,
@@ -157,8 +166,12 @@ public class DapperDataMartReaderIntegrationTests
                 ClosePrice = 152m,
                 Volume = 5000000m,
                 LoadedAt = DateTime.UtcNow
-            },
-            new FactQuote
+            });
+        }
+
+        if (!await context.FactQuotes.AnyAsync(f => f.AssetKey == asset.AssetKey && f.DateKey == todayKey && f.SourceKey == source.SourceKey))
+        {
+            context.FactQuotes.Add(new FactQuote
             {
                 AssetKey = asset.AssetKey,
                 DateKey = todayKey,
@@ -169,8 +182,9 @@ public class DapperDataMartReaderIntegrationTests
                 ClosePrice = 156m,
                 Volume = 6000000m,
                 LoadedAt = DateTime.UtcNow
-            }
-        );
+            });
+        }
+
         await context.SaveChangesAsync();
     }
 }
