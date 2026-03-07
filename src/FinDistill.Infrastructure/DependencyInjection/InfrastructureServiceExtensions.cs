@@ -88,10 +88,20 @@ public static class InfrastructureServiceExtensions
         // Retry handler for HTTP clients
         services.AddTransient<RetryDelegatingHandler>();
 
-        // API providers (registered as IMarketDataProvider for IEnumerable<IMarketDataProvider> injection)
-        services.AddHttpClient<YahooFinanceProvider>()
+        // API providers: register each under its concrete type for IHttpClientFactory pipeline,
+        // then add separate IMarketDataProvider registrations for IEnumerable<IMarketDataProvider> injection.
+        // Using AddHttpClient<IMarketDataProvider, T> would cause the second call to overwrite the first.
+        services.AddHttpClient<YahooFinanceProvider>(client =>
+            {
+                client.DefaultRequestHeaders.UserAgent.ParseAdd("FinDistill.BI/1.0");
+                client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+            })
             .AddHttpMessageHandler<RetryDelegatingHandler>();
-        services.AddHttpClient<CoinGeckoProvider>()
+        services.AddHttpClient<CoinGeckoProvider>(client =>
+            {
+                client.DefaultRequestHeaders.UserAgent.ParseAdd("FinDistill.BI/1.0");
+                client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+            })
             .AddHttpMessageHandler<RetryDelegatingHandler>();
         services.AddScoped<IMarketDataProvider, YahooFinanceProvider>();
         services.AddScoped<IMarketDataProvider, CoinGeckoProvider>();

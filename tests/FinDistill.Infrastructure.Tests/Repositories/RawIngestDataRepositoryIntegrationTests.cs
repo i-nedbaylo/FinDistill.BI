@@ -46,8 +46,9 @@ public class RawIngestDataRepositoryIntegrationTests
 
         var unprocessed = await repo.GetUnprocessedAsync(CancellationToken.None);
 
-        Assert.True(unprocessed.Count >= 2);
-        Assert.All(unprocessed, r => Assert.False(r.IsProcessed));
+        var inserted = unprocessed.Where(r => r.Source == uniqueSource).ToList();
+        Assert.Equal(2, inserted.Count);
+        Assert.All(inserted, r => Assert.False(r.IsProcessed));
     }
 
     [DockerAvailableFact]
