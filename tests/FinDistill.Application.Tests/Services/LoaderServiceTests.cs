@@ -153,4 +153,32 @@ public class LoaderServiceTests
         _assetRepoMock.Verify(r => r.UpsertAsync(It.IsAny<DimAsset>(), It.IsAny<CancellationToken>()), Times.Never);
         _factRepoMock.Verify(r => r.AddRangeAsync(It.IsAny<IEnumerable<FactQuote>>(), It.IsAny<CancellationToken>()), Times.Never);
     }
+
+    [Fact]
+    public async Task LoadAsync_IntraBatchDuplicates_InsertsOnlyFirst()
+    {
+        SetupDimensions();
+        _factRepoMock.Setup(r => r.ExistsAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+
+        // Two quotes with same (Ticker, Date, SourceType) in one batch
+        var quotes = new List<ParsedQuoteDto>
+        {
+            new() { Ticker = "BTC", Date = new DateOnly(2024, 3, 7), Close = 100, SourceType = DataSourceType.CoinGecko },
+            new() { Ticker = "BTC", Date = new DateOnly(2024, 3, 7), Close = 101, SourceType = DataSourceType.CoinGecko }
+        };
+
+        var sut = CreateSut();
+        var result = await sut.LoadAsync(quotes, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        // Only one fact inserted despite two input quotes
+        _factRepoMock.Verify(r => r.AddRangeAsync(
+            It.Is<IEnumerable<FactQuote>>(q => q.Count() == 1),
+            It.IsAny<CancellationToken>()), Times.Once);
+        // ExistsAsync called only once (second quote skipped by batchKeys before DB check)
+        _factRepoMock.Verify(r => r.ExistsAsync(
+            It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
 }
