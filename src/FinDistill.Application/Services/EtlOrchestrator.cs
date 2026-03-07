@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 namespace FinDistill.Application.Services;
 
 /// <summary>
-/// Orchestrates the full ETL pipeline: Extract → Transform → Load.
+/// Orchestrates the full ETL pipeline: Extract → Transform → Load → (optional) ClickHouse Sync.
 /// Catches and logs exceptions at each stage without stopping the pipeline.
 /// </summary>
 public class EtlOrchestrator : IEtlOrchestrator
@@ -13,17 +13,20 @@ public class EtlOrchestrator : IEtlOrchestrator
     private readonly IExtractorService _extractor;
     private readonly ITransformerService _transformer;
     private readonly ILoaderService _loader;
+    private readonly IClickHouseSyncService? _clickHouseSync;
     private readonly ILogger<EtlOrchestrator> _logger;
 
     public EtlOrchestrator(
         IExtractorService extractor,
         ITransformerService transformer,
         ILoaderService loader,
-        ILogger<EtlOrchestrator> logger)
+        ILogger<EtlOrchestrator> logger,
+        IClickHouseSyncService? clickHouseSync = null)
     {
         _extractor = extractor;
         _transformer = transformer;
         _loader = loader;
+        _clickHouseSync = clickHouseSync;
         _logger = logger;
     }
 
@@ -44,6 +47,12 @@ public class EtlOrchestrator : IEtlOrchestrator
             if (parsed.Count > 0)
             {
                 await _loader.LoadAsync(parsed, ct);
+
+                // Sync to ClickHouse (if enabled)
+                if (_clickHouseSync is not null)
+                {
+                    await _clickHouseSync.SyncAsync(ct);
+                }
             }
             else
             {

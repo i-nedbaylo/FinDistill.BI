@@ -300,16 +300,82 @@
 
 > Реализуется только после базового функционала (Фазы 0–9). Интерфейс `IDataMartReader` уже заложен в Фазе 1.
 
-- [ ] **11.1** Добавить NuGet-пакет `ClickHouse.Client` в FinDistIll.Infrastructure
-- [ ] **11.2** Создать класс настроек `Configuration/ClickHouseOptions.cs`:
+- [✅] **11.1** Добавить NuGet-пакет `ClickHouse.Client` 7.8.0 в FinDistill.Infrastructure
+- [✅] **11.2** Создать класс настроек `Configuration/ClickHouseOptions.cs`:
   - ConnectionString (из ConnectionStrings:ClickHouse)
-- [ ] **11.3** Реализовать `DataMarts/ClickHouseDataMartReader.cs : IDataMartReader`:
-  - SQL-запросы адаптированные под ClickHouse SQL-диалекта
-  - Параметризованные запросы
-- [ ] **11.4** Создать `ClickHouseSyncService` — ETL-этап синхронизации DWH → ClickHouse:
-  - Batch insert из dwh.FactQuotes + Dimensions в таблицы ClickHouse
+- [✅] **11.3** Реализовать `DataMarts/ClickHouseDataMartReader.cs : IDataMartReader`:
+  - SQL-запросы адаптированные под ClickHouse SQL-диалект (ROW_NUMBER, if, round)
+  - Параметризованные запросы через ClickHouse.Client AddParameter
+- [✅] **11.4** Создать `ClickHouseSyncService` — ETL-этап синхронизации DWH → ClickHouse:
+  - `Application/Interfaces/IClickHouseSyncService.cs` — интерфейс в Application
+  - `Infrastructure/DataMarts/ClickHouseSyncService.cs` — реализация через ClickHouseBulkCopy
+  - Batch insert DimAssets, DimDates, DimSources, FactQuotes
   - Вызывается после LoaderService в оркестраторе (только при UseClickHouse = true)
-- [ ] **11.5** Создать DDL-скрипты для таблиц ClickHouse (MergeTree engine)
-- [ ] **11.6** Обновить `AddInfrastructure`: при `Features:UseClickHouse = true` → регистрировать `ClickHouseDataMartReader` вместо `DapperDataMartReader`
-- [ ] **11.7** Обновить `EtlOrchestrator` — вызывать `ClickHouseSyncService` после Load (при включённом флаге)
-- [ ] **11.8** Проверить работу с ClickHouse включённым и выключенным
+- [✅] **11.5** Создать DDL-скрипт `Scripts/ClickHouse_DDL.sql`:
+  - ReplacingMergeTree engine для idempotent inserts
+  - Таблицы: dwh.DimAssets, dwh.DimDates, dwh.DimSources, dwh.FactQuotes
+- [✅] **11.6** Обновить `AddInfrastructure`: при `Features:UseClickHouse = true`:
+  - Читает `ConnectionStrings:ClickHouse` → `ClickHouseOptions`
+  - Регистрирует `ClickHouseDataMartReader` вместо `DapperDataMartReader`
+  - Регистрирует `IClickHouseSyncService` → `ClickHouseSyncService`
+- [✅] **11.7** Обновить `EtlOrchestrator`:
+  - Опциональный `IClickHouseSyncService?` (nullable, default parameter)
+  - Вызов `SyncAsync` после Load когда сервис зарегистрирован
+- [✅] **11.8** Проверить: build 0 errors, 33 tests pass, UseClickHouse=false → DapperDataMartReader
+
+---
+
+## Фаза 12. Result Pattern (опциональная)
+
+> Замена механизма обработки ошибок: вместо try/catch + возврат null → явный `Result<T>` / `Result` тип.
+> Повышает читаемость, тестируемость и вытесняет исключения из flow-control.
+
+- [ ] **12.1** Создать `Result<T>` и `Result` типы в Domain:
+  - `Domain/Common/Result.cs` — `IsSuccess`, `IsFailure`, `Error`
+  - `Domain/Common/Result{T}.cs` — generic-версия с `Value`
+  - `Domain/Common/Error.cs` — `Code`, `Message` (value object)
+  - Immutable, без исключений в конструкторе
+- [ ] **12.2** Рефакторинг ETL-сервисов (Application):
+  - `ExtractorService.ExtractAsync` → `Task<Result>`
+  - `TransformerService.TransformAsync` → `Task<Result<IReadOnlyList<ParsedQuoteDto>>>`
+  - `LoaderService.LoadAsync` → `Task<Result>`
+  - `EtlOrchestrator.RunEtlPipelineAsync` → проверяет `result.IsFailure`, логирует `result.Error`
+- [ ] **12.3** Рефакторинг DashboardService:
+  - `GetDailyPerformanceAsync` → `Task<Result<IReadOnlyList<DailyPerformanceDto>>>`
+  - Контроллеры: pattern match по `result.IsSuccess` → View / Error page
+- [ ] **12.4** Рефакторинг Repository-методов (Domain interfaces):
+  - `UpsertAsync` → `Task<Result<DimAsset>>`
+  - `ExistsAsync` → оставить `Task<bool>` (не нуждается в Result)
+- [ ] **12.5** Обновить unit-тесты:
+  - Assert на `result.IsSuccess` / `result.IsFailure` / `result.Error.Code`
+- [ ] **12.6** Собрать проект, все тесты зелёные
+
+---
+
+## Фаза 13. Integration-тесты с Testcontainers (опциональная)
+
+> Реальные integration-тесты с SQL Server / PostgreSQL в Docker-контейнерах.
+> Проверяют EF Core миграции, репозитории, Dapper-запросы на реальной СУБД.
+
+- [ ] **13.1** Добавить NuGet-пакеты в `FinDistill.Infrastructure.Tests`:
+  - `Testcontainers` (базовый пакет)
+  - `Testcontainers.MsSql` (SQL Server контейнер)
+  - `Testcontainers.PostgreSql` (PostgreSQL контейнер)
+  - `Microsoft.EntityFrameworkCore.Design` (для миграций в тестах)
+- [ ] **13.2** Создать `Fixtures/SqlServerContainerFixture.cs`:
+  - `IAsyncLifetime`: StartAsync → поднять контейнер, StopAsync → остановить
+  - Автоматическое применение миграций (`context.Database.MigrateAsync`)
+  - Экспортирует connection string для тестов
+- [ ] **13.3** Создать `Fixtures/PostgreSqlContainerFixture.cs`:
+  - Аналогичный fixture для PostgreSQL
+- [ ] **13.4** Создать integration-тесты для репозиториев:
+  - `Repositories/DimAssetRepositoryIntegrationTests.cs` — UpsertAsync insert → update, GetByTickerAsync
+  - `Repositories/DimDateRepositoryIntegrationTests.cs` — EnsureDateExistsAsync idempotent
+  - `Repositories/FactQuoteRepositoryIntegrationTests.cs` — AddRangeAsync + ExistsAsync
+  - `Repositories/RawIngestDataRepositoryIntegrationTests.cs` — AddRangeAsync + GetUnprocessedAsync + MarkAsProcessedAsync
+- [ ] **13.5** Создать integration-тест для DapperDataMartReader:
+  - Применить миграции + seed данные → проверить SQL Views через Dapper
+- [ ] **13.6** Создать integration-тест для EF Core миграций:
+  - `context.Database.MigrateAsync()` → не бросает exception
+  - Проверить существование схем `lake`, `dwh`, `mart`
+- [ ] **13.7** Собрать и запустить тесты: `dotnet test` — все зелёные
