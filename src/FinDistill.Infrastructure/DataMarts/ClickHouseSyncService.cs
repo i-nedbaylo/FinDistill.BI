@@ -11,7 +11,7 @@ namespace FinDistill.Infrastructure.DataMarts;
 
 /// <summary>
 /// Synchronizes dimension and fact data from the OLTP DWH (EF Core) to ClickHouse tables.
-/// Performs batch inserts using ClickHouseBulkCopy for efficient data transfer.
+/// Uses TRUNCATE + bulk insert (full-refresh) to avoid duplicates from ReplacingMergeTree merge lag.
 /// </summary>
 public class ClickHouseSyncService : IClickHouseSyncService
 {
@@ -52,9 +52,18 @@ public class ClickHouseSyncService : IClickHouseSyncService
         }
     }
 
+    private async Task TruncateTableAsync(ClickHouseConnection connection, string tableName, CancellationToken ct)
+    {
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = $"TRUNCATE TABLE IF EXISTS {tableName}";
+        await cmd.ExecuteNonQueryAsync(ct);
+    }
+
     private async Task SyncDimAssetsAsync(ClickHouseConnection connection, CancellationToken ct)
     {
         var assets = await _dbContext.DimAssets.AsNoTracking().ToListAsync(ct);
+
+        await TruncateTableAsync(connection, "dwh.DimAssets", ct);
 
         using var bulkCopy = new ClickHouseBulkCopy(connection)
         {
@@ -78,6 +87,8 @@ public class ClickHouseSyncService : IClickHouseSyncService
     {
         var dates = await _dbContext.DimDates.AsNoTracking().ToListAsync(ct);
 
+        await TruncateTableAsync(connection, "dwh.DimDates", ct);
+
         using var bulkCopy = new ClickHouseBulkCopy(connection)
         {
             DestinationTableName = "dwh.DimDates",
@@ -100,6 +111,8 @@ public class ClickHouseSyncService : IClickHouseSyncService
     {
         var sources = await _dbContext.DimSources.AsNoTracking().ToListAsync(ct);
 
+        await TruncateTableAsync(connection, "dwh.DimSources", ct);
+
         using var bulkCopy = new ClickHouseBulkCopy(connection)
         {
             DestinationTableName = "dwh.DimSources",
@@ -120,6 +133,8 @@ public class ClickHouseSyncService : IClickHouseSyncService
     private async Task SyncFactQuotesAsync(ClickHouseConnection connection, CancellationToken ct)
     {
         var facts = await _dbContext.FactQuotes.AsNoTracking().ToListAsync(ct);
+
+        await TruncateTableAsync(connection, "dwh.FactQuotes", ct);
 
         using var bulkCopy = new ClickHouseBulkCopy(connection)
         {
