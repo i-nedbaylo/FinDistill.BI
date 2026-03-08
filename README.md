@@ -425,4 +425,4 @@ The following design decisions were made deliberately to keep the project focuse
 
 ---
 
-*Generated from the FinDistill.BI codebase. For architectural rules, see [`.github/copilot-instructions.md`](../.github/copilot-instructions.md). For implementation progress, see [`.github/WORKPLAN.md`](../.github/WORKPLAN.md).*
+*Generated from the FinDistill.BI codebase. For architectural rules, see [`.github/copilot-instructions.md`](.github/copilot-instructions.md). For implementation progress, see [`.github/WORKPLAN.md`](.github/WORKPLAN.md).*
