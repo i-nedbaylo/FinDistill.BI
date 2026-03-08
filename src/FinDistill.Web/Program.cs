@@ -1,5 +1,7 @@
 using FinDistill.Application.DependencyInjection;
 using FinDistill.Infrastructure.DependencyInjection;
+using FinDistill.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 using Serilog;
 
 Log.Logger = new LoggerConfiguration()
@@ -24,11 +26,21 @@ try
 
     var app = builder.Build();
 
+    // Auto-migrate on startup (required for Railway PostgreSQL)
+    using (var scope = app.Services.CreateScope())
+    {
+        var db = scope.ServiceProvider.GetRequiredService<FinDistillDbContext>();
+        db.Database.Migrate();
+    }
+
     if (!app.Environment.IsDevelopment())
     {
         app.UseExceptionHandler("/Home/Error");
         app.UseHsts();
     }
+
+    // Health check endpoint for Railway
+    app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
 
     app.UseHttpsRedirection();
     app.UseStaticFiles();

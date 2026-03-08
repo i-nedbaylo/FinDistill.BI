@@ -1,0 +1,20 @@
+[build]
+builder = "dockerfile"
+
+[[services]]
+name = "findistill-web"
+dockerfile = "src/FinDistill.Web/Dockerfile"
+
+[services.deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 60
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
+
+[[services]]
+name = "findistill-worker"
+dockerfile = "src/FinDistill.Worker/Dockerfile"
+
+[services.deploy]
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3

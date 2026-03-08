@@ -431,3 +431,43 @@
   - `dotnet publish` для Web и Worker
   - Upload как артефакты `findistill-web` и `findistill-worker` (retention 14 дней)
 - [✅] **15.4** Обновить WORKPLAN — добавить Фазу 15
+
+---
+
+## Фаза 16. Railway.app — автоматический деплой
+
+> Автоматический деплой Web + Worker на Railway.app из ветки main.
+> PostgreSQL предоставляется Railway как managed сервис.
+> Деплой triggered автоматически при каждом push в main.
+
+- [✅] **16.1** Создать `src/FinDistill.Web/Dockerfile` (multi-stage build, порт 8080)
+- [✅] **16.2** Создать `src/FinDistill.Worker/Dockerfile` (multi-stage build, без порта)
+- [✅] **16.3** Создать `railway.toml` в корне репозитория:
+  - Два сервиса: `findistill-web` и `findistill-worker`
+  - health check на `/health` для Web-сервиса
+- [✅] **16.4** Добавить авто-миграции в `Web/Program.cs`:
+  - `db.Database.Migrate()` при старте (применяет EF Core миграции к Railway PostgreSQL)
+- [✅] **16.5** Добавить `/health` endpoint в `Web/Program.cs`:
+  - `app.MapGet("/health", ...)` → Railway health check
+- [✅] **16.6** Создать `appsettings.Production.json` для Web и Worker:
+  - `Database:Provider = PostgreSQL`
+  - Serilog только Console sink (файлы не нужны в контейнере)
+- [ ] **16.7** Настроить Railway Project вручную (один раз):
+  - Создать New Project → Deploy from GitHub repo
+  - Добавить PostgreSQL сервис (Railway built-in)
+  - Создать сервис `findistill-web`: Dockerfile = `src/FinDistill.Web/Dockerfile`
+  - Создать сервис `findistill-worker`: Dockerfile = `src/FinDistill.Worker/Dockerfile`
+  - Установить переменные окружения (см. ниже)
+  - Скопировать Public URL → вставить в GitHub репозиторий (About → Website)
+- [ ] **16.8** Установить переменные окружения в Railway Dashboard для обоих сервисов:
+  ```
+  ConnectionStrings__DefaultConnection  = ${{Postgres.DATABASE_URL}}   (Railway reference variable)
+  Database__Provider                    = PostgreSQL
+  DataSources__YahooFinance__Enabled    = true
+  DataSources__YahooFinance__Tickers    = AAPL,MSFT,SPY,QQQ
+  DataSources__CoinGecko__Enabled       = true
+  DataSources__CoinGecko__CoinIds       = bitcoin,ethereum
+  DataSources__CoinGecko__VsCurrency    = usd
+  Features__UseRedis                    = false
+  Features__UseClickHouse               = false
+  ```
