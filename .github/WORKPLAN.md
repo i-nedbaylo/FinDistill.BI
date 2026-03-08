@@ -412,3 +412,22 @@
 - [✅] **14.11** Code review: `Microsoft.EntityFrameworkCore.Design` → добавить `PrivateAssets="all"`
 - [✅] **14.12** Code review: `DockerAvailableFactAttribute` — удалить `TryStartDockerDesktop`, убить процесс при timeout
 - [✅] **14.13** Собрать проект: build 0 errors, 73 tests pass
+
+---
+
+## Фаза 15. CI/CD Pipeline (GitHub Actions)
+
+> Автоматизация сборки, тестирования и публикации артефактов через GitHub Actions.
+
+- [✅] **15.1** Создать `.github/workflows/ci-cd.yml`:
+  - Триггеры: push в `main`, pull request в `main`
+  - Платформа: `ubuntu-latest`, .NET 8.0.x
+- [✅] **15.2** Job `build-and-test`:
+  - `dotnet restore` → `dotnet build` (Release) → `dotnet test`
+  - Unit-тесты: Domain, Application, Infrastructure (без integration)
+  - Integration-тесты: через Testcontainers (`continue-on-error: true`, зависят от Docker daemon)
+  - Upload test results (TRX) как артефакт (retention 30 дней)
+- [✅] **15.3** Publish артефакты (только push в main):
+  - `dotnet publish` для Web и Worker
+  - Upload как артефакты `findistill-web` и `findistill-worker` (retention 14 дней)
+- [✅] **15.4** Обновить WORKPLAN — добавить Фазу 15

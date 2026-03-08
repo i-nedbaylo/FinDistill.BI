@@ -2,26 +2,40 @@ using System.Net;
 using System.Text.Json;
 using FinDistill.Domain.Enums;
 using FinDistill.Domain.Interfaces;
+using FinDistill.Infrastructure.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace FinDistill.Infrastructure.Providers;
 
 /// <summary>
 /// Market data provider for CoinGecko free API.
 /// Fetches historical market data for cryptocurrencies.
+/// Supports optional Demo API key via x-cg-demo-api-key header.
 /// Retry logic is handled by RetryDelegatingHandler in the HTTP pipeline.
 /// </summary>
 public class CoinGeckoProvider : IMarketDataProvider
 {
     private readonly HttpClient _httpClient;
     private readonly ILogger<CoinGeckoProvider> _logger;
+    private readonly CoinGeckoOptions _options;
 
     private const string BaseUrl = "https://api.coingecko.com/api/v3";
 
-    public CoinGeckoProvider(HttpClient httpClient, ILogger<CoinGeckoProvider> logger)
+    public CoinGeckoProvider(
+        HttpClient httpClient,
+        ILogger<CoinGeckoProvider> logger,
+        IOptions<DataSourcesOptions> options)
     {
         _httpClient = httpClient;
         _logger = logger;
+        _options = options.Value.CoinGecko;
+
+        // Add Demo API key header once on the shared client if configured
+        if (!string.IsNullOrWhiteSpace(_options.ApiKey))
+        {
+            _httpClient.DefaultRequestHeaders.TryAddWithoutValidation("x-cg-demo-api-key", _options.ApiKey);
+        }
     }
 
     public DataSourceType SourceType => DataSourceType.CoinGecko;
@@ -29,7 +43,8 @@ public class CoinGeckoProvider : IMarketDataProvider
     public async Task<string> FetchRawDataAsync(string coinId, CancellationToken ct)
     {
         var encodedCoinId = Uri.EscapeDataString(coinId);
-        var url = $"{BaseUrl}/coins/{encodedCoinId}/market_chart?vs_currency=usd&days=5&interval=daily";
+        var vsCurrency = _options.VsCurrency;
+        var url = $"{BaseUrl}/coins/{encodedCoinId}/market_chart?vs_currency={vsCurrency}&days=5&interval=daily";
 
         var response = await _httpClient.GetAsync(url, ct);
         response.EnsureSuccessStatusCode();
@@ -41,9 +56,11 @@ public class CoinGeckoProvider : IMarketDataProvider
     public async Task<IEnumerable<string>> FetchBulkDataAsync(IEnumerable<string> coinIds, CancellationToken ct)
     {
         var results = new List<string>();
+        var coinList = coinIds.ToList();
 
-        foreach (var coinId in coinIds)
+        for (var i = 0; i < coinList.Count; i++)
         {
+            var coinId = coinList[i];
             try
             {
                 var result = await FetchRawDataAsync(coinId, ct);
@@ -52,6 +69,12 @@ public class CoinGeckoProvider : IMarketDataProvider
             catch (Exception ex)
             {
                 _logger.LogError(ex, "CoinGecko: failed to fetch {CoinId}, skipping", coinId);
+            }
+
+            // Throttle requests to avoid 429, skip delay after the last coin
+            if (i < coinList.Count - 1 && _options.RequestDelayMs > 0)
+            {
+                await Task.Delay(_options.RequestDelayMs, ct);
             }
         }
 

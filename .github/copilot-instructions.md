@@ -463,3 +463,46 @@ else
 |---|---|---|---|---|---|
 | Redis | `Features:UseRedis` | `false` | `ICacheService` | `NullCacheService` | `RedisCacheService` |
 | ClickHouse | `Features:UseClickHouse` | `false` | `IDataMartReader` | `DapperDataMartReader` | `ClickHouseDataMartReader` |
+
+---
+
+## 11. CI/CD Pipeline (GitHub Actions)
+
+> Автоматизация сборки, тестирования и публикации через GitHub Actions.
+> Конфигурация: `.github/workflows/ci-cd.yml`.
+
+### 11.1 Триггеры
+
+| Событие | Действие |
+|---|---|
+| `push` в `main` | Полный pipeline: build → test → publish артефактов |
+| `pull_request` в `main` | Build + test (без publish) |
+
+### 11.2 Структура pipeline
+
+```
+Restore → Build (Release) → Unit Tests → Integration Tests → Publish → Upload Artifacts
+                                                │                        │
+                                          Testcontainers           Только push в main
+                                          (continue-on-error)
+```
+
+### 11.3 Тестирование в CI
+
+- **Unit-тесты** — запускаются всегда, блокируют pipeline при падении.
+- **Integration-тесты** — используют **Testcontainers** (каждый тест поднимает собственный SQL Server / PostgreSQL контейнер); `continue-on-error: true` (не блокируют pipeline, т.к. зависят от Docker daemon).
+- Фильтрация: `--filter "FullyQualifiedName!~IntegrationTests"` для unit, `~IntegrationTests` для integration.
+- Результаты (TRX) загружаются как артефакты (retention 30 дней).
+- CI **не использует** GitHub Actions service containers — вся инфраструктура управляется Testcontainers fixtures.
+
+### 11.4 Публикация
+
+- `dotnet publish` для `FinDistill.Web` и `FinDistill.Worker` (Release, только при push в main).
+- Артефакты: `findistill-web`, `findistill-worker` (retention 14 дней).
+
+### 11.5 Правила для Copilot
+
+18. **Не изменять** структуру CI/CD workflow без явного запроса.
+19. При добавлении нового тестового проекта — добавить соответствующий шаг `dotnet test` в workflow.
+20. Integration-тесты **всегда** `continue-on-error: true` в CI (зависимость от внешних сервисов).
+21. Артефакты публикуются **только** при push в main, не при pull request.
