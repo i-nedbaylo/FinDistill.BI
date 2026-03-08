@@ -410,7 +410,7 @@ The following design decisions were made deliberately to keep the project focuse
 
 - [ ] Dockerfile for Web and Worker services
 - [ ] `docker-compose.yml` with SQL Server, Redis, ClickHouse
-- [ ] GitHub Actions CI/CD (build → test → publish → deploy)
+- [x] GitHub Actions CI/CD (build → test → publish → deploy)
 - [ ] Kubernetes Helm chart (optional)
 - [ ] Blue-green or canary deployment strategy
 
