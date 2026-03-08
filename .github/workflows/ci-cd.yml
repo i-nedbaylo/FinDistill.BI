@@ -1,0 +1,86 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  DOTNET_VERSION: '8.0.x'
+  SOLUTION_FILE: 'FinDistill.BI.sln'
+
+jobs:
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore dependencies
+        run: dotnet restore ${{ env.SOLUTION_FILE }}
+
+      - name: Build
+        run: dotnet build ${{ env.SOLUTION_FILE }} --no-restore --configuration Release
+
+      - name: Run unit tests
+        run: |
+          dotnet test tests/FinDistill.Domain.Tests/FinDistill.Domain.Tests.csproj \
+            --no-build --configuration Release --logger "trx;LogFileName=domain.trx" --results-directory ./test-results
+
+          dotnet test tests/FinDistill.Application.Tests/FinDistill.Application.Tests.csproj \
+            --no-build --configuration Release --logger "trx;LogFileName=application.trx" --results-directory ./test-results
+
+          dotnet test tests/FinDistill.Infrastructure.Tests/FinDistill.Infrastructure.Tests.csproj \
+            --no-build --configuration Release --logger "trx;LogFileName=infrastructure.trx" --results-directory ./test-results \
+            --filter "FullyQualifiedName!~IntegrationTests"
+
+      - name: Run integration tests (Testcontainers)
+        run: |
+          dotnet test tests/FinDistill.Infrastructure.Tests/FinDistill.Infrastructure.Tests.csproj \
+            --no-build --configuration Release --logger "trx;LogFileName=integration.trx" --results-directory ./test-results \
+            --filter "FullyQualifiedName~IntegrationTests"
+        continue-on-error: true
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: ./test-results/*.trx
+          retention-days: 30
+
+      - name: Publish Web
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          dotnet publish src/FinDistill.Web/FinDistill.Web.csproj \
+            --configuration Release --output ./publish/web --no-restore
+
+      - name: Publish Worker
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          dotnet publish src/FinDistill.Worker/FinDistill.Worker.csproj \
+            --configuration Release --output ./publish/worker --no-restore
+
+      - name: Upload Web artifact
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: findistill-web
+          path: ./publish/web
+          retention-days: 14
+
+      - name: Upload Worker artifact
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: findistill-worker
+          path: ./publish/worker
+          retention-days: 14
