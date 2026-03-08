@@ -6,5 +6,6 @@ namespace FinDistill.Infrastructure.Configuration;
 /// </summary>
 public class ClickHouseOptions
 {
+    /// <summary>ADO.NET connection string for the ClickHouse instance.</summary>
     public string ConnectionString { get; set; } = string.Empty;
 }

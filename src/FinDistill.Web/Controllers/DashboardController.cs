@@ -18,6 +18,8 @@ public class DashboardController : Controller
         _logger = logger;
     }
 
+    /// <summary>Renders the dashboard view with portfolio summary data.</summary>
+    /// <param name="ct">Cancellation token.</param>
     public async Task<IActionResult> Index(CancellationToken ct)
     {
         var portfolioResult = await _dashboardService.GetPortfolioSummaryAsync(ct);

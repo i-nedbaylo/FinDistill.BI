@@ -4,6 +4,10 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace FinDistill.Infrastructure.Persistence.Configurations;
 
+/// <summary>
+/// EF Core Fluent API configuration for <see cref="DimSource"/>.
+/// Maps to the <c>dwh.DimSources</c> table with a unique index on <c>SourceName</c>.
+/// </summary>
 public class DimSourceConfiguration : IEntityTypeConfiguration<DimSource>
 {
     public void Configure(EntityTypeBuilder<DimSource> builder)

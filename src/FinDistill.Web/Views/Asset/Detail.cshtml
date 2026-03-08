@@ -62,7 +62,6 @@ else
 
 @section Scripts {
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"
-            integrity="sha256-YEGZ9MHMHp5YM3KPkMRMki08lfkOxBWl1OBkBqOKhQY="
             crossorigin="anonymous"></script>
     <script>
         const labels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.History.Select(h => h.Date.ToString("yyyy-MM-dd"))));

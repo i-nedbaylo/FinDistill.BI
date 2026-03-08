@@ -24,6 +24,11 @@ public class EtlWorker : BackgroundService
         _schedule = schedule.Value;
     }
 
+    /// <summary>
+    /// Main execution loop. Runs the ETL pipeline repeatedly at the configured interval
+    /// until <paramref name="stoppingToken"/> is cancelled.
+    /// </summary>
+    /// <param name="stoppingToken">Token signalled when the host is shutting down.</param>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var intervalMinutes = _schedule.IntervalMinutes;

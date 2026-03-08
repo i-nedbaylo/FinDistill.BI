@@ -5,5 +5,6 @@ namespace FinDistill.Domain.Common;
 /// </summary>
 public sealed record Error(string Code, string Message)
 {
+    /// <summary>Sentinel value used for successful results that carry no error.</summary>
     public static readonly Error None = new(string.Empty, string.Empty);
 }

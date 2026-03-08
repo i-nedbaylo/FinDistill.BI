@@ -8,5 +8,9 @@ namespace FinDistill.Application.Interfaces;
 /// </summary>
 public interface ILoaderService
 {
+    /// <summary>Upserts dimension records and inserts new fact quotes, skipping duplicates.</summary>
+    /// <param name="quotes">Parsed and validated quote DTOs produced by the Transformer stage.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>A <see cref="Result"/> indicating success or failure.</returns>
     Task<Result> LoadAsync(IEnumerable<ParsedQuoteDto> quotes, CancellationToken ct);
 }

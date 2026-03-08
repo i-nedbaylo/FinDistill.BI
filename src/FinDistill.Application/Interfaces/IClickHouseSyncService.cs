@@ -6,5 +6,7 @@ namespace FinDistill.Application.Interfaces;
 /// </summary>
 public interface IClickHouseSyncService
 {
+    /// <summary>Synchronizes all DWH dimension and fact data to ClickHouse.</summary>
+    /// <param name="ct">Cancellation token.</param>
     Task SyncAsync(CancellationToken ct);
 }

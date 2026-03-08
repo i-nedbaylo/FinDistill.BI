@@ -9,6 +9,11 @@ namespace FinDistill.Application.DependencyInjection;
 /// </summary>
 public static class ApplicationServiceExtensions
 {
+    /// <summary>
+    /// Registers ETL pipeline services and <see cref="IDashboardService"/> as Scoped.
+    /// </summary>
+    /// <param name="services">The service collection to register into.</param>
+    /// <returns>The same <paramref name="services"/> instance for chaining.</returns>
     public static IServiceCollection AddApplicationServices(this IServiceCollection services)
     {
         // ETL pipeline services
