@@ -483,28 +483,24 @@ else
 ```
 Restore → Build (Release) → Unit Tests → Integration Tests → Publish → Upload Artifacts
                                                 │                        │
-                                          SQL Server service      Только push в main
+                                          Testcontainers           Только push в main
                                           (continue-on-error)
 ```
 
-### 11.3 Service containers
-
-- **SQL Server 2022** (`mcr.microsoft.com/mssql/server:2022-latest`) — для integration-тестов.
-- Health check обеспечивает готовность контейнера до запуска тестов.
-
-### 11.4 Тестирование в CI
+### 11.3 Тестирование в CI
 
 - **Unit-тесты** — запускаются всегда, блокируют pipeline при падении.
-- **Integration-тесты** — запускаются с SQL Server service container, `continue-on-error: true` (не блокируют pipeline).
+- **Integration-тесты** — используют **Testcontainers** (каждый тест поднимает собственный SQL Server / PostgreSQL контейнер); `continue-on-error: true` (не блокируют pipeline, т.к. зависят от Docker daemon).
 - Фильтрация: `--filter "FullyQualifiedName!~IntegrationTests"` для unit, `~IntegrationTests` для integration.
 - Результаты (TRX) загружаются как артефакты (retention 30 дней).
+- CI **не использует** GitHub Actions service containers — вся инфраструктура управляется Testcontainers fixtures.
 
-### 11.5 Публикация
+### 11.4 Публикация
 
 - `dotnet publish` для `FinDistill.Web` и `FinDistill.Worker` (Release, только при push в main).
 - Артефакты: `findistill-web`, `findistill-worker` (retention 14 дней).
 
-### 11.6 Правила для Copilot
+### 11.5 Правила для Copilot
 
 18. **Не изменять** структуру CI/CD workflow без явного запроса.
 19. При добавлении нового тестового проекта — добавить соответствующий шаг `dotnet test` в workflow.

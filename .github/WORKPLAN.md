@@ -423,10 +423,9 @@
   - Триггеры: push в `main`, pull request в `main`
   - Платформа: `ubuntu-latest`, .NET 8.0.x
 - [✅] **15.2** Job `build-and-test`:
-  - SQL Server 2022 service container для integration-тестов
   - `dotnet restore` → `dotnet build` (Release) → `dotnet test`
   - Unit-тесты: Domain, Application, Infrastructure (без integration)
-  - Integration-тесты: с SQL Server service container (`continue-on-error: true`)
+  - Integration-тесты: через Testcontainers (`continue-on-error: true`, зависят от Docker daemon)
   - Upload test results (TRX) как артефакт (retention 30 дней)
 - [✅] **15.3** Publish артефакты (только push в main):
   - `dotnet publish` для Web и Worker

@@ -15,20 +15,6 @@ jobs:
     name: Build & Test
     runs-on: ubuntu-latest
 
-    services:
-      mssql:
-        image: mcr.microsoft.com/mssql/server:2022-latest
-        env:
-          ACCEPT_EULA: Y
-          SA_PASSWORD: Strong_P@ssw0rd!
-        ports:
-          - 1433:1433
-        options: >-
-          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'Strong_P@ssw0rd!' -Q 'SELECT 1' -C -No"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -56,9 +42,7 @@ jobs:
             --no-build --configuration Release --logger "trx;LogFileName=infrastructure.trx" --results-directory ./test-results \
             --filter "FullyQualifiedName!~IntegrationTests"
 
-      - name: Run integration tests (SQL Server)
-        env:
-          ConnectionStrings__DefaultConnection: "Server=localhost,1433;Database=FinDistillBI_CI;User Id=sa;Password=Strong_P@ssw0rd!;TrustServerCertificate=True;"
+      - name: Run integration tests (Testcontainers)
         run: |
           dotnet test tests/FinDistill.Infrastructure.Tests/FinDistill.Infrastructure.Tests.csproj \
             --no-build --configuration Release --logger "trx;LogFileName=integration.trx" --results-directory ./test-results \

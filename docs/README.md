@@ -345,8 +345,7 @@ Automated via GitHub Actions (`.github/workflows/ci-cd.yml`).
 ```
 Restore → Build (Release) → Unit Tests → Integration Tests → Publish → Upload Artifacts
                                                 │                        │
-                                          SQL Server 2022          Only on push to main
-                                          service container
+                                          Testcontainers           Only on push to main
                                           (continue-on-error)
 ```
 
@@ -360,7 +359,7 @@ dotnet test --filter "FullyQualifiedName!~IntegrationTests"
 
 ### Integration tests
 
-Run against a SQL Server 2022 service container with `continue-on-error: true` — they do **not** block the pipeline since they depend on external infrastructure:
+Use **Testcontainers** — each test fixture starts its own SQL Server / PostgreSQL container via Docker. Marked with `continue-on-error: true` since they depend on Docker daemon availability:
 
 ```bash
 dotnet test --filter "FullyQualifiedName~IntegrationTests"
@@ -457,7 +456,7 @@ The following design decisions were made deliberately to keep the project focuse
 
 - [ ] Dockerfile for Web and Worker services
 - [ ] `docker-compose.yml` with SQL Server, Redis, ClickHouse
-- [x] GitHub Actions CI/CD (build → test → publish → deploy)
+- [x] GitHub Actions CI (build → test → publish artifacts)
 - [ ] Kubernetes Helm chart (optional)
 - [ ] Blue-green or canary deployment strategy
 
