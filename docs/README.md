@@ -16,8 +16,9 @@
 7. [Configuration Reference](#7-configuration-reference)
 8. [Running the Application](#8-running-the-application)
 9. [Testing Strategy](#9-testing-strategy)
-10. [Simplifications (Educational/Demo Scope)](#10-simplifications-educationaldemo-scope)
-11. [Production Hardening Roadmap](#11-production-hardening-roadmap)
+10. [CI/CD Pipeline](#10-cicd-pipeline)
+11. [Simplifications (Educational/Demo Scope)](#11-simplifications-educationaldemo-scope)
+12. [Production Hardening Roadmap](#12-production-hardening-roadmap)
 
 ---
 
@@ -328,11 +329,58 @@ Uses **Testcontainers** (SQL Server + PostgreSQL) with `[DockerAvailableFact]` �
 
 ---
 
-## 10. Simplifications (Educational/Demo Scope)
+## 10. CI/CD Pipeline
+
+Automated via GitHub Actions (`.github/workflows/ci-cd.yml`).
+
+### Triggers
+
+| Event | Scope |
+|---|---|
+| `push` to `main` | Full pipeline: build → test → publish artifacts |
+| `pull_request` to `main` | Build + test only (no publish) |
+
+### Pipeline stages
+
+```
+Restore → Build (Release) → Unit Tests → Integration Tests → Publish → Upload Artifacts
+                                                │                        │
+                                          SQL Server 2022          Only on push to main
+                                          service container
+                                          (continue-on-error)
+```
+
+### Unit tests
+
+Run for all three test projects. Failures **block** the pipeline:
+
+```bash
+dotnet test --filter "FullyQualifiedName!~IntegrationTests"
+```
+
+### Integration tests
+
+Run against a SQL Server 2022 service container with `continue-on-error: true` — they do **not** block the pipeline since they depend on external infrastructure:
+
+```bash
+dotnet test --filter "FullyQualifiedName~IntegrationTests"
+```
+
+### Artifacts
+
+| Artifact | Published when | Retention |
+|---|---|---|
+| `test-results` (TRX) | Always | 30 days |
+| `findistill-web` | Push to `main` | 14 days |
+| `findistill-worker` | Push to `main` | 14 days |
+
+---
+
+## 11. Simplifications (Educational/Demo Scope)
 
 The following design decisions were made deliberately to keep the project focused on demonstrating architectural patterns rather than production-readiness:
 
-### 10.1 Security
+### 11.1 Security
 
 | Simplification | Production expectation |
 |---|---|
@@ -341,7 +389,7 @@ The following design decisions were made deliberately to keep the project focuse
 | CSRF protection on Sync only | Consistent anti-forgery across all mutations |
 | API keys in `appsettings.Development.json` | Azure Key Vault / AWS Secrets Manager |
 
-### 10.2 Data processing
+### 11.2 Data processing
 
 | Simplification | Production expectation |
 |---|---|
@@ -351,17 +399,16 @@ The following design decisions were made deliberately to keep the project focuse
 | No data retention policy | TTL-based purging of Data Lake records |
 | `SaveChangesAsync` per dimension upsert | Bulk upsert via `ExecuteUpdateAsync` batching |
 
-### 10.3 Infrastructure
+### 11.3 Infrastructure
 
 | Simplification | Production expectation |
 |---|---|
 | Rolling file logs only | Centralized logging (ELK, Seq, Application Insights) |
 | No health checks | `/health` endpoint with DB/API liveness probes |
 | No containerization | Dockerfile + docker-compose |
-| No CI/CD pipeline | GitHub Actions with build→test→deploy stages |
 | No telemetry/metrics | OpenTelemetry + Prometheus/Grafana |
 
-### 10.4 API resilience
+### 11.4 API resilience
 
 | Simplification | Production expectation |
 |---|---|
@@ -370,7 +417,7 @@ The following design decisions were made deliberately to keep the project focuse
 | Static 1–1.5s inter-request delay | Adaptive rate limiting based on API response headers |
 | Yahoo Finance v8 undocumented API | Official API with SLA or paid data provider |
 
-### 10.5 Frontend
+### 11.5 Frontend
 
 | Simplification | Production expectation |
 |---|---|
@@ -381,7 +428,7 @@ The following design decisions were made deliberately to keep the project focuse
 
 ---
 
-## 11. Production Hardening Roadmap
+## 12. Production Hardening Roadmap
 
 ### Priority 1 — Security & reliability
 
