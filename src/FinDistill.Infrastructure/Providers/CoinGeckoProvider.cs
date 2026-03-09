@@ -55,7 +55,7 @@ public class CoinGeckoProvider : IMarketDataProvider
     {
         var encodedCoinId = Uri.EscapeDataString(coinId);
         var vsCurrency = _options.VsCurrency;
-        var url = $"{PublicBaseUrl}/coins/{encodedCoinId}/market_chart?vs_currency={vsCurrency}&days=5&interval=daily";
+        var url = $"{PublicBaseUrl}/coins/{encodedCoinId}/market_chart?vs_currency={vsCurrency}&days=365&interval=daily";
 
         var response = await _httpClient.GetAsync(url, ct);
         response.EnsureSuccessStatusCode();
