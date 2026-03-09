@@ -312,7 +312,9 @@ The application supports both SQL Server and PostgreSQL. All layers (EF Core, Da
 **Step 3:** Apply EF Core migrations for the chosen provider:
 
 ```bash
-dotnet ef database update --project src/FinDistill.Web
+dotnet ef database update \
+  --project src/FinDistill.Infrastructure \
+  --startup-project src/FinDistill.Web
 ```
 
 **Via environment variables:**
@@ -488,8 +490,8 @@ Replaces Dapper (SQL Server/PostgreSQL) with ClickHouse as the read engine for D
 **Step 1:** Set up a ClickHouse instance and create tables:
 
 ```bash
-# Apply the DDL script to your ClickHouse instance
-clickhouse-client --multiquery < Scripts/ClickHouse_DDL.sql
+# Apply the DDL script to your ClickHouse instance (run from the repository root)
+clickhouse-client --multiquery < src/FinDistill.Infrastructure/Scripts/ClickHouse_DDL.sql
 ```
 
 **Step 2:** Configure the connection:
@@ -526,15 +528,17 @@ ConnectionStrings__ClickHouse="Host=clickhouse-server;Port=8123;Database=default
 
 **Options class:** `FeaturesOptions` — property `UseRedis`
 
-The `ICacheService` interface and `NullCacheService` (no-op) are already implemented. Redis integration (`RedisCacheService`) is planned for Phase 10.
+> ⚠️ **Not yet active:** The `UseRedis` flag is defined but has no effect in the current implementation — `NullCacheService` is always registered regardless of this setting. Full Redis integration (`RedisCacheService`) is planned for Phase 10. The section below documents the intended behaviour once implemented.
+
+The `ICacheService` interface and `NullCacheService` (no-op) are already implemented.
 
 ```jsonc
 {
   "ConnectionStrings": {
-    "Redis": "localhost:6379"  // Required when UseRedis = true
+    "Redis": "localhost:6379"  // Will be required when UseRedis = true (Phase 10)
   },
   "Features": {
-    "UseRedis": true  // default: false
+    "UseRedis": false  // default: false — setting to true has no effect yet
   }
 }
 ```
@@ -542,7 +546,7 @@ The `ICacheService` interface and `NullCacheService` (no-op) are already impleme
 | `UseRedis` | `ICacheService` implementation | Behavior |
 |---|---|---|
 | `false` (default) | `NullCacheService` | All cache calls return `null` — transparent pass-through |
-| `true` | `RedisCacheService` (Phase 10) | Cache-aside pattern for Data Mart reads |
+| `true` *(Phase 10)* | `RedisCacheService` | Cache-aside pattern for Data Mart reads |
 
 ---
 
@@ -669,7 +673,9 @@ DataSources__CoinGecko__VsCurrency=usd
 dotnet restore
 
 # 2. Apply EF Core migrations
-dotnet ef database update --project src/FinDistill.Web
+dotnet ef database update \
+  --project src/FinDistill.Infrastructure \
+  --startup-project src/FinDistill.Web
 
 # 3. Configure CoinGecko API key (in appsettings.Development.json)
 # "DataSources": { "CoinGecko": { "ApiKey": "CG-your_key_here" } }
@@ -739,4 +745,222 @@ Restore → Build (Release) → Unit Tests → Integration Tests → Publish →
 Run for all three test projects. Failures **block** the pipeline:
 
 ```bash
-dotnen
+dotnet test --filter "FullyQualifiedName!~IntegrationTests"
+```
+
+### Integration tests
+
+Use **Testcontainers** — each test fixture starts its own SQL Server / PostgreSQL container via Docker. Marked with `continue-on-error: true` since they depend on Docker daemon availability:
+
+```bash
+dotnet test --filter "FullyQualifiedName~IntegrationTests"
+```
+
+### Artifacts
+
+| Artifact | Published when | Retention |
+|---|---|---|
+| `test-results` (TRX) | Always | 30 days |
+| `findistill-web` | Push to `main` | 14 days |
+| `findistill-worker` | Push to `main` | 14 days |
+
+---
+
+## 12. Deployment
+
+The application includes ready-to-use deployment configurations for **Railway.app** and **Render.com**, plus general guidelines for production environments.
+
+### 12.1 Railway.app (Two-Process Deployment)
+
+Railway supports deploying multiple services from a single repository. Configuration is defined in `railway.toml`.
+
+**Architecture:** Web + Worker as separate services + managed PostgreSQL.
+
+```
+┌─────────────────────────────────────────┐
+│  Railway Project                        │
+│  ┌──────────────┐  ┌────────────────┐   │
+│  │ findistill-  │  │ findistill-    │   │
+│  │ web          │  │ worker         │   │
+│  │ (Dockerfile) │  │ (Dockerfile)   │   │
+│  └──────┬───────┘  └───────┬────────┘   │
+│         │                  │            │
+│         └────────┬─────────┘            │
+│                  ▼                      │
+│         ┌──────────────┐                │
+│         │  PostgreSQL  │                │
+│         │  (managed)   │                │
+│         └──────────────┘                │
+└─────────────────────────────────────────┘
+```
+
+**Setup steps:**
+
+1. Create a new Railway project → **Deploy from GitHub repo** → select `FinDistill.BI`
+2. Add PostgreSQL: **+ New** → **Database** → **Add PostgreSQL**
+3. Configure `findistill-web` service: Settings → Dockerfile Path → `src/FinDistill.Web/Dockerfile`
+4. Add `findistill-worker` service: **+ New** → **GitHub Repo** → same repo → Dockerfile Path → `src/FinDistill.Worker/Dockerfile`
+5. Set environment variables for both services (indexed notation for arrays):
+
+```bash
+ConnectionStrings__DefaultConnection    = ${{Postgres.DATABASE_URL}}
+Database__Provider                      = PostgreSQL
+Database__AutoMigrate                   = true
+DataSources__YahooFinance__Enabled      = true
+DataSources__YahooFinance__Tickers__0   = AAPL
+DataSources__YahooFinance__Tickers__1   = MSFT
+DataSources__YahooFinance__Tickers__2   = SPY
+DataSources__YahooFinance__Tickers__3   = QQQ
+DataSources__CoinGecko__Enabled         = true
+DataSources__CoinGecko__CoinIds__0      = bitcoin
+DataSources__CoinGecko__CoinIds__1      = ethereum
+DataSources__CoinGecko__VsCurrency      = usd
+Features__UseRedis                      = false
+Features__UseClickHouse                 = false
+```
+
+> ⚠️ Railway is a **paid service** ($5/month Hobby plan or trial credits).
+
+### 12.2 Render.com (Single-Process — Free Tier)
+
+Render supports a single free web service with a managed PostgreSQL database (free for 90 days). Configuration is defined in `render.yaml`.
+
+**Architecture:** Web with in-process ETL (`RunEtlInProcess = true`).
+
+```
+┌──────────────────────────┐
+│  Render Project          │
+│  ┌────────────────────┐  │
+│  │ findistill-web     │  │
+│  │ (HTTP + ETL)       │  │
+│  │ RunEtlInProcess=   │  │
+│  │ true               │  │
+│  └─────────┬──────────┘  │
+│            ▼             │
+│  ┌────────────────────┐  │
+│  │ PostgreSQL (free)  │  │
+│  └────────────────────┘  │
+└──────────────────────────┘
+```
+
+**Setup steps:**
+
+1. Create a new Render project → **Blueprint** → select `FinDistill.BI` repository
+2. Render reads `render.yaml` and auto-creates the Web service + PostgreSQL database
+3. Link the database: Dashboard → Service → **Environment** → connect `DATABASE_URL` to the database
+
+The `render.yaml` already includes all required environment variables with `Features__RunEtlInProcess=true`.
+
+> **Note:** Render injects `DATABASE_URL` in `postgres://user:pass@host:port/db` format. `Program.cs` automatically converts this to an Npgsql connection string, including URL-decoding of all components.
+
+> **Note:** Render uses a dynamic `$PORT` at runtime. The Dockerfile uses a shell-form `CMD` to support this: `CMD ["sh", "-c", "exec dotnet FinDistill.Web.dll --urls http://+:${PORT:-8080}"]`
+
+### 12.3 General Production Guidelines
+
+| Area | Recommendation |
+|---|---|
+| Database | Use SQL Server or PostgreSQL with automatic backups and appropriate performance tier |
+| Hosting | Host Web and Worker as separate services; configure scaling based on CPU/memory |
+| Networking | Use virtual network isolation; restrict database access to known IPs |
+| Security | Enable HTTPS/HSTS; use managed identities or Key Vault for secrets; rotate credentials |
+| Monitoring | Enable Application Insights or OpenTelemetry for real-time diagnostics and alerts |
+
+---
+
+## 13. Simplifications (Educational/Demo Scope)
+
+The following design decisions were made deliberately to keep the project focused on demonstrating architectural patterns rather than production-readiness:
+
+### 13.1 Security
+
+| Simplification | Production expectation |
+|---|---|
+| No authentication/authorization | ASP.NET Core Identity or OAuth2/OIDC |
+| No HTTPS enforcement in dev | HSTS + TLS certificates |
+| CSRF protection on Sync only | Consistent anti-forgery across all mutations |
+| API keys in `appsettings.Development.json` | Azure Key Vault / AWS Secrets Manager |
+
+### 13.2 Data processing
+
+| Simplification | Production expectation |
+|---|---|
+| Full-table sync for ClickHouse (TRUNCATE + re-insert) | Incremental/CDC sync |
+| Single-threaded ETL (sequential tickers) | Parallel extraction with `SemaphoreSlim` |
+| In-memory deduplication (per-batch HashSet) | Upsert/MERGE at database level |
+| No data retention policy | TTL-based purging of Data Lake records |
+| `SaveChangesAsync` per dimension upsert | Bulk upsert via `ExecuteUpdateAsync` batching |
+
+### 13.3 Infrastructure
+
+| Simplification | Production expectation |
+|---|---|
+| Rolling file logs only | Centralized logging (ELK, Seq, Application Insights) |
+| `/health` endpoint (liveness only) | Full `/health` + `/ready` with DB/API probes |
+| No telemetry/metrics | OpenTelemetry + Prometheus/Grafana |
+
+### 13.4 API resilience
+
+| Simplification | Production expectation |
+|---|---|
+| Custom `RetryDelegatingHandler` (3 retries, exponential backoff) | Polly policies (retry + circuit breaker + timeout) |
+| No circuit breaker pattern | Polly `CircuitBreakerPolicy` per provider |
+| Static 1–1.5s inter-request delay | Adaptive rate limiting based on API response headers |
+| Yahoo Finance v8 undocumented API | Official API with SLA or paid data provider |
+
+### 13.5 Frontend
+
+| Simplification | Production expectation |
+|---|---|
+| Server-side rendered views (MVC + Razor) | SPA (React/Vue) or Blazor for rich interactivity |
+| Chart.js via CDN | Bundled/versioned JS assets (Webpack/Vite) |
+| No real-time updates | SignalR for live price updates |
+| No responsive design optimization | Tailwind CSS / Bootstrap 5 responsive grid |
+
+---
+
+## 14. Production Hardening Roadmap
+
+### Priority 1 — Security & reliability
+
+- [ ] Add ASP.NET Core Identity with role-based authorization
+- [ ] Move secrets to Azure Key Vault / environment variables
+- [ ] Add Polly policies (circuit breaker, bulkhead, timeout) to replace custom retry handler
+- [ ] Add health check endpoints (`/health`, `/ready`) for load balancer probes
+- [ ] Implement structured exception middleware with ProblemDetails responses
+
+### Priority 2 — Observability
+
+- [ ] Integrate OpenTelemetry (traces, metrics, logs)
+- [ ] Add Prometheus metrics endpoint for ETL duration, record counts, API error rates
+- [ ] Replace file sinks with centralized logging (Seq, ELK, or Application Insights)
+- [ ] Add correlation IDs across ETL pipeline stages
+
+### Priority 3 — Data pipeline improvements
+
+- [ ] Parallel extraction with configurable concurrency (`SemaphoreSlim`)
+- [ ] Incremental ClickHouse sync (delta-only inserts by `LoadedAt` watermark)
+- [ ] Data Lake retention policy (archive/purge records older than N days)
+- [ ] Database-level upsert (MERGE/ON CONFLICT) to replace read-then-write pattern
+- [ ] Dead-letter queue for failed transformations
+
+### Priority 4 — Infrastructure & deployment
+
+- [ ] `docker-compose.yml` with SQL Server, Redis, ClickHouse for local development
+- [x] Dockerfile for Web and Worker services
+- [x] GitHub Actions CI (build → test → publish artifacts)
+- [x] Railway.app and Render.com deployment configurations
+- [ ] Kubernetes Helm chart (optional)
+- [ ] Blue-green or canary deployment strategy
+
+### Priority 5 — Feature completeness
+
+- [ ] **Phase 10**: Redis caching (`RedisCacheService` with cache-aside in `DashboardService`)
+- [ ] Additional data providers (Alpha Vantage, Polygon.io)
+- [ ] User-configurable watchlists (database-backed)
+- [ ] Real-time price updates via SignalR
+- [ ] Export to CSV/Excel
+- [ ] Alert system (price threshold notifications via email/Telegram)
+
+---
+
+*For architectural overview see sections 2–6 above. For deployment instructions see section 12.*
