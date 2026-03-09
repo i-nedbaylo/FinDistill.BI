@@ -27,7 +27,8 @@ try
             var username = Uri.UnescapeDataString(userInfo[0]);
             var password = Uri.UnescapeDataString(userInfo[1]);
             var databaseName = Uri.UnescapeDataString(uri.AbsolutePath.TrimStart('/'));
-            var npgsqlCs = $"Host={uri.Host};Port={uri.Port};Database={databaseName};Username={username};Password={password};SSL Mode=Require;Trust Server Certificate=true";
+            // SSL Mode=VerifyFull validates the server certificate — do not use Trust Server Certificate here
+            var npgsqlCs = $"Host={uri.Host};Port={uri.Port};Database={databaseName};Username={username};Password={password};SSL Mode=VerifyFull";
             builder.Configuration["ConnectionStrings:DefaultConnection"] = npgsqlCs;
         }
         else
