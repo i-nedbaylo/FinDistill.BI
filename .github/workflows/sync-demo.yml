@@ -5,6 +5,11 @@ on:
     branches:
       - demo
 
+# Prevent concurrent mirror pushes from racing when multiple commits land on demo
+concurrency:
+  group: sync-demo
+  cancel-in-progress: false
+
 jobs:
   sync:
     runs-on: ubuntu-latest
@@ -14,10 +19,13 @@ jobs:
         with:
           fetch-depth: 0
           ref: demo
+          # Disable default credential persistence so it does not interfere
+          # with the PUBLIC_REPO_TOKEN used to push to the mirror repository
+          persist-credentials: false
 
       - name: Push to public mirror repository
         env:
           PUBLIC_REPO_TOKEN: ${{ secrets.PUBLIC_REPO_TOKEN }}
         run: |
           git remote add public https://x-access-token:${PUBLIC_REPO_TOKEN}@github.com/i-nedbaylo/FinDistill.BI-demo.git
-          git push public HEAD:main --force
+          git push public HEAD:main --force-with-lease
