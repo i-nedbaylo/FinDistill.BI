@@ -6,7 +6,7 @@ namespace FinDistill.Infrastructure.Persistence.Configurations;
 
 /// <summary>
 /// EF Core Fluent API configuration for <see cref="RawIngestData"/>.
-/// Maps to the <c>lake.RawIngestData</c> table with a filtered index on <c>IsProcessed</c>.
+/// Maps to the <c>lake.RawIngestData</c> table with an index on <c>IsProcessed</c>.
 /// </summary>
 public class RawIngestDataConfiguration : IEntityTypeConfiguration<RawIngestData>
 {

@@ -1,7 +1,7 @@
+using FinDistill.Application.Configuration;
 using FinDistill.Application.DependencyInjection;
 using FinDistill.Infrastructure.DependencyInjection;
 using FinDistill.Worker;
-using FinDistill.Worker.Configuration;
 using Serilog;
 
 Log.Logger = new LoggerConfiguration()

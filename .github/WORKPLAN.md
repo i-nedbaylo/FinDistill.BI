@@ -461,13 +461,27 @@
   - Скопировать Public URL → вставить в GitHub репозиторий (About → Website)
 - [ ] **16.8** Установить переменные окружения в Railway Dashboard для обоих сервисов:
   ```
-  ConnectionStrings__DefaultConnection  = ${{Postgres.DATABASE_URL}}   (Railway reference variable)
-  Database__Provider                    = PostgreSQL
-  DataSources__YahooFinance__Enabled    = true
-  DataSources__YahooFinance__Tickers    = AAPL,MSFT,SPY,QQQ
-  DataSources__CoinGecko__Enabled       = true
-  DataSources__CoinGecko__CoinIds       = bitcoin,ethereum
-  DataSources__CoinGecko__VsCurrency    = usd
-  Features__UseRedis                    = false
-  Features__UseClickHouse               = false
+  ConnectionStrings__DefaultConnection    = ${{Postgres.DATABASE_URL}}
+  Database__Provider                      = PostgreSQL
+  DataSources__YahooFinance__Enabled      = true
+  DataSources__YahooFinance__Tickers__0   = AAPL
+  DataSources__YahooFinance__Tickers__1   = MSFT
+  DataSources__YahooFinance__Tickers__2   = SPY
+  DataSources__YahooFinance__Tickers__3   = QQQ
+  DataSources__CoinGecko__Enabled         = true
+  DataSources__CoinGecko__CoinIds__0      = bitcoin
+  DataSources__CoinGecko__CoinIds__1      = ethereum
+  DataSources__CoinGecko__VsCurrency      = usd
+  Features__UseRedis                      = false
+  Features__UseClickHouse                 = false
+  Database__AutoMigrate                   = true
   ```
+  > ⚠️ Comma-separated strings (e.g. `Tickers=AAPL,MSFT`) are NOT split by the .NET binder.
+  > Always use indexed notation (`Tickers__0`, `Tickers__1`, …) for array values.
+
+---
+
+## Фаза 17. In-Process ETL Worker (для бесплатного хостинга)
+
+> Feature flag `Features:RunEtlInProcess` позволяет запустить ETL внутри Web-процесса.
+> Не нарушает архитектуру двух отдельных точек входа — Worker остаётся independent

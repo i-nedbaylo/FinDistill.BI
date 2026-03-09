@@ -22,6 +22,6 @@ public class AssetDetailViewModel
     /// <summary>Percentage change from the previous day's close.</summary>
     public decimal ChangePercent { get; set; }
 
-    /// <summary>Historical OHLCV records for the requested time range, ordered by date ascending.</summary>
+    /// <summary>Historical OHLCV records for the requested time range, ordered by date descending.</summary>
     public IReadOnlyList<AssetHistoryDto> History { get; set; } = [];
 }
