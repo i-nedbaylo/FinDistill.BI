@@ -19,7 +19,7 @@ public class YahooFinanceProvider : IMarketDataProvider
     private readonly ILogger<YahooFinanceProvider> _logger;
     private readonly YahooFinanceOptions _options;
 
-    private const string BaseUrl = "https://query1.finance.yahoo.com/v8/finance/chart";
+    private const string BaseUrl = "https://query2.finance.yahoo.com/v8/finance/chart";
 
     public YahooFinanceProvider(
         HttpClient httpClient,

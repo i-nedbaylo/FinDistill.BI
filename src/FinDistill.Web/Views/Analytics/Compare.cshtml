@@ -1,0 +1,97 @@
+@model ComparativeReturnViewModel
+@{
+    ViewData["Title"] = "Comparative Returns";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Comparative Returns (Normalized)</h2>
+    <div>
+        <a asp-action="Compare" asp-route-days="30" class="btn btn-sm @(Model.Days == 30 ? "btn-primary" : "btn-outline-primary")">30D</a>
+        <a asp-action="Compare" asp-route-days="90" class="btn btn-sm @(Model.Days == 90 ? "btn-primary" : "btn-outline-primary")">90D</a>
+        <a asp-action="Compare" asp-route-days="180" class="btn btn-sm @(Model.Days == 180 ? "btn-primary" : "btn-outline-primary")">180D</a>
+        <a asp-action="Compare" asp-route-days="365" class="btn btn-sm @(Model.Days == 365 ? "btn-primary" : "btn-outline-primary")">1Y</a>
+    </div>
+</div>
+
+<p class="text-muted">
+    All assets normalized to base 100 on the first date in the range. Values above 100 indicate gains, below 100 indicate losses.
+</p>
+
+@if (Model.Returns.Count == 0)
+{
+    <div class="alert alert-info">No data available. Click <strong>Sync Now</strong> to fetch market data.</div>
+}
+else
+{
+    <div class="card">
+        <div class="card-body">
+            <canvas id="compareChart" height="100"></canvas>
+        </div>
+    </div>
+}
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"
+            crossorigin="anonymous"></script>
+    <script>
+        const chartColors = [
+            'rgb(75, 192, 192)',
+            'rgb(255, 99, 132)',
+            'rgb(54, 162, 235)',
+            'rgb(255, 205, 86)',
+            'rgb(153, 102, 255)',
+            'rgb(255, 159, 64)',
+            'rgb(201, 203, 207)',
+            'rgb(0, 204, 150)'
+        ];
+
+        const tickers = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Tickers));
+        const allData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+            Model.Returns.Select(r => new { r.Ticker, Date = r.Date.ToString("yyyy-MM-dd"), r.NormalizedReturn })));
+
+        // Get unique dates (x-axis labels)
+        const dates = [...new Set(allData.map(d => d.Date))].sort();
+
+        // Build one dataset per ticker
+        const datasets = tickers.map((ticker, idx) => {
+            const tickerData = allData.filter(d => d.Ticker === ticker);
+            const dataMap = Object.fromEntries(tickerData.map(d => [d.Date, d.NormalizedReturn]));
+            return {
+                label: ticker,
+                data: dates.map(date => dataMap[date] ?? null),
+                borderColor: chartColors[idx % chartColors.length],
+                backgroundColor: 'transparent',
+                tension: 0.3,
+                pointRadius: 0,
+                borderWidth: 2
+            };
+        });
+
+        const ctx = document.getElementById('compareChart');
+        if (ctx && datasets.length > 0) {
+            new Chart(ctx, {
+                type: 'line',
+                data: { labels: dates, datasets: datasets },
+                options: {
+                    responsive: true,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { display: true, position: 'top' },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.dataset.label + ': ' + context.parsed.y.toFixed(2);
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            title: { display: true, text: 'Normalized Return (base = 100)' }
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+}

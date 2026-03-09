@@ -1,0 +1,70 @@
+@model Week52HighLowViewModel
+@{
+    ViewData["Title"] = "52-Week High/Low";
+}
+
+<h2 class="mb-4">52-Week High / Low Screener</h2>
+
+<p class="text-muted">
+    Shows each asset's position relative to its 52-week trading range. Green indicates proximity to the high; red indicates proximity to the low.
+</p>
+
+@if (Model.Assets.Count == 0)
+{
+    <div class="alert alert-info">No data available. Click <strong>Sync Now</strong> to fetch market data.</div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped table-hover">
+            <thead class="table-dark">
+                <tr>
+                    <th>Ticker</th>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th class="text-end">Last Close</th>
+                    <th class="text-end">52W High</th>
+                    <th class="text-end">52W Low</th>
+                    <th class="text-end">% from High</th>
+                    <th class="text-end">% from Low</th>
+                    <th style="width: 200px;">Range Position</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Model.Assets)
+                {
+                    var fromHighClass = item.PctFromHigh >= 0 ? "text-success" : "text-danger";
+                    var fromLowClass = item.PctFromLow >= 0 ? "text-success" : "text-danger";
+                    // Calculate position within 52-week range (0% = at low, 100% = at high)
+                    var range = item.High52W - item.Low52W;
+                    var position = range > 0 ? (int)Math.Round((item.LastClose - item.Low52W) / range * 100) : 50;
+                    var barColor = position >= 70 ? "bg-success" : position >= 30 ? "bg-warning" : "bg-danger";
+
+                    <tr>
+                        <td>
+                            <a asp-controller="Asset" asp-action="Detail" asp-route-ticker="@item.Ticker">
+                                <strong>@item.Ticker</strong>
+                            </a>
+                        </td>
+                        <td>@item.Name</td>
+                        <td><span class="badge bg-secondary">@item.AssetType</span></td>
+                        <td class="text-end">@item.LastClose.ToString("N2")</td>
+                        <td class="text-end">@item.High52W.ToString("N2")</td>
+                        <td class="text-end">@item.Low52W.ToString("N2")</td>
+                        <td class="text-end @fromHighClass">@(item.PctFromHigh >= 0 ? "+" : "")@item.PctFromHigh.ToString("N2")%</td>
+                        <td class="text-end @fromLowClass">+@item.PctFromLow.ToString("N2")%</td>
+                        <td>
+                            <div class="progress" style="height: 20px;" title="@position% from low to high">
+                                <div class="progress-bar @barColor" role="progressbar"
+                                     style="width: @position%;" aria-valuenow="@position"
+                                     aria-valuemin="0" aria-valuemax="100">
+                                    @position%
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

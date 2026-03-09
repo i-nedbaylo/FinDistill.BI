@@ -73,4 +73,139 @@ public class DapperDataMartReader : IDataMartReader
             new CommandDefinition(sql, cancellationToken: ct));
         return results.ToList();
     }
+
+    public async Task<IReadOnlyList<ComparativeReturnRecord>> GetComparativeReturnsAsync(int days, CancellationToken ct)
+    {
+        var sql = _isPostgreSql
+            ? """
+              SELECT
+                  a."Ticker",
+                  d."FullDate" AS "Date",
+                  fq."ClosePrice" AS "Close",
+                  CASE
+                      WHEN FIRST_VALUE(fq."ClosePrice") OVER (PARTITION BY a."AssetKey" ORDER BY d."FullDate") = 0 THEN 0
+                      ELSE ROUND(fq."ClosePrice" / FIRST_VALUE(fq."ClosePrice") OVER (PARTITION BY a."AssetKey" ORDER BY d."FullDate") * 100, 2)
+                  END AS "NormalizedReturn"
+              FROM dwh."FactQuotes" fq
+              INNER JOIN dwh."DimAssets" a ON a."AssetKey" = fq."AssetKey"
+              INNER JOIN dwh."DimDates" d ON d."DateKey" = fq."DateKey"
+              WHERE a."IsActive" = true
+                AND d."FullDate" >= CURRENT_DATE - @Days
+              ORDER BY a."Ticker", d."FullDate"
+              """
+            : """
+              SELECT
+                  a.Ticker,
+                  d.FullDate AS [Date],
+                  fq.ClosePrice AS [Close],
+                  CASE
+                      WHEN FIRST_VALUE(fq.ClosePrice) OVER (PARTITION BY a.AssetKey ORDER BY d.FullDate) = 0 THEN 0
+                      ELSE ROUND(fq.ClosePrice / FIRST_VALUE(fq.ClosePrice) OVER (PARTITION BY a.AssetKey ORDER BY d.FullDate) * 100, 2)
+                  END AS NormalizedReturn
+              FROM dwh.FactQuotes fq
+              INNER JOIN dwh.DimAssets a ON a.AssetKey = fq.AssetKey
+              INNER JOIN dwh.DimDates d ON d.DateKey = fq.DateKey
+              WHERE a.IsActive = 1
+                AND d.FullDate >= DATEADD(DAY, -@Days, GETDATE())
+              ORDER BY a.Ticker, d.FullDate
+              """;
+
+        using var connection = _connectionFactory.CreateConnection();
+        var results = await connection.QueryAsync<ComparativeReturnRecord>(
+            new CommandDefinition(sql, new { Days = days }, cancellationToken: ct));
+        return results.ToList();
+    }
+
+    public async Task<IReadOnlyList<Week52HighLowRecord>> GetWeek52HighLowAsync(CancellationToken ct)
+    {
+        var sql = _isPostgreSql
+            ? """
+              WITH latest AS (
+                  SELECT DISTINCT ON (a."AssetKey")
+                      a."AssetKey",
+                      a."Ticker",
+                      a."Name",
+                      a."AssetType",
+                      fq."ClosePrice" AS "LastClose"
+                  FROM dwh."DimAssets" a
+                  INNER JOIN dwh."FactQuotes" fq ON fq."AssetKey" = a."AssetKey"
+                  INNER JOIN dwh."DimDates" d ON d."DateKey" = fq."DateKey"
+                  WHERE a."IsActive" = true
+                  ORDER BY a."AssetKey", d."FullDate" DESC
+              ),
+              range52 AS (
+                  SELECT
+                      fq."AssetKey",
+                      MAX(fq."ClosePrice") AS "High52W",
+                      MIN(fq."ClosePrice") AS "Low52W"
+                  FROM dwh."FactQuotes" fq
+                  INNER JOIN dwh."DimDates" d ON d."DateKey" = fq."DateKey"
+                  WHERE d."FullDate" >= CURRENT_DATE - 365
+                  GROUP BY fq."AssetKey"
+              )
+              SELECT
+                  l."Ticker",
+                  l."Name",
+                  l."AssetType",
+                  l."LastClose",
+                  COALESCE(r."High52W", l."LastClose") AS "High52W",
+                  COALESCE(r."Low52W", l."LastClose") AS "Low52W",
+                  CASE WHEN COALESCE(r."High52W", 0) = 0 THEN 0
+                       ELSE ROUND((l."LastClose" - r."High52W") / r."High52W" * 100, 2)
+                  END AS "PctFromHigh",
+                  CASE WHEN COALESCE(r."Low52W", 0) = 0 THEN 0
+                       ELSE ROUND((l."LastClose" - r."Low52W") / r."Low52W" * 100, 2)
+                  END AS "PctFromLow"
+              FROM latest l
+              LEFT JOIN range52 r ON r."AssetKey" = l."AssetKey"
+              ORDER BY l."Ticker"
+              """
+            : """
+              WITH latest AS (
+                  SELECT
+                      a.AssetKey,
+                      a.Ticker,
+                      a.Name,
+                      a.AssetType,
+                      fq.ClosePrice AS LastClose,
+                      ROW_NUMBER() OVER (PARTITION BY a.AssetKey ORDER BY d.FullDate DESC) AS rn
+                  FROM dwh.DimAssets a
+                  INNER JOIN dwh.FactQuotes fq ON fq.AssetKey = a.AssetKey
+                  INNER JOIN dwh.DimDates d ON d.DateKey = fq.DateKey
+                  WHERE a.IsActive = 1
+              ),
+              range52 AS (
+                  SELECT
+                      fq.AssetKey,
+                      MAX(fq.ClosePrice) AS High52W,
+                      MIN(fq.ClosePrice) AS Low52W
+                  FROM dwh.FactQuotes fq
+                  INNER JOIN dwh.DimDates d ON d.DateKey = fq.DateKey
+                  WHERE d.FullDate >= DATEADD(DAY, -365, GETDATE())
+                  GROUP BY fq.AssetKey
+              )
+              SELECT
+                  l.Ticker,
+                  l.Name,
+                  l.AssetType,
+                  l.LastClose,
+                  COALESCE(r.High52W, l.LastClose) AS High52W,
+                  COALESCE(r.Low52W, l.LastClose) AS Low52W,
+                  CASE WHEN COALESCE(r.High52W, 0) = 0 THEN 0
+                       ELSE ROUND((l.LastClose - r.High52W) / r.High52W * 100, 2)
+                  END AS PctFromHigh,
+                  CASE WHEN COALESCE(r.Low52W, 0) = 0 THEN 0
+                       ELSE ROUND((l.LastClose - r.Low52W) / r.Low52W * 100, 2)
+                  END AS PctFromLow
+              FROM latest l
+              LEFT JOIN range52 r ON r.AssetKey = l.AssetKey
+              WHERE l.rn = 1
+              ORDER BY l.Ticker
+              """;
+
+        using var connection = _connectionFactory.CreateConnection();
+        var results = await connection.QueryAsync<Week52HighLowRecord>(
+            new CommandDefinition(sql, cancellationToken: ct));
+        return results.ToList();
+    }
 }
