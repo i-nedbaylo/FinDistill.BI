@@ -14,6 +14,7 @@ public class DashboardService : IDashboardService
 {
     private readonly IDataMartReader _martReader;
     private readonly ICacheService _cache;
+    private readonly ICryptoMarketProvider _cryptoMarketProvider;
     private readonly ILogger<DashboardService> _logger;
 
     private static readonly TimeSpan DefaultCacheTtl = TimeSpan.FromMinutes(5);
@@ -21,10 +22,12 @@ public class DashboardService : IDashboardService
     public DashboardService(
         IDataMartReader martReader,
         ICacheService cache,
+        ICryptoMarketProvider cryptoMarketProvider,
         ILogger<DashboardService> logger)
     {
         _martReader = martReader;
         _cache = cache;
+        _cryptoMarketProvider = cryptoMarketProvider;
         _logger = logger;
     }
 
@@ -224,6 +227,97 @@ public class DashboardService : IDashboardService
             _logger.LogError(ex, "Failed to get 52-week high/low data");
             return Result.Failure<IReadOnlyList<Week52HighLowDto>>(
                 new Error("Dashboard.Week52HighLow", ex.Message));
+        }
+    }
+
+    public async Task<Result<IReadOnlyList<CryptoMarketDto>>> GetCryptoMarketOverviewAsync(int limit, CancellationToken ct)
+    {
+        try
+        {
+            var clampedLimit = Math.Clamp(limit, 1, 250);
+            var cacheKey = $"market:crypto:{clampedLimit}";
+
+            var cached = await _cache.GetAsync<List<CryptoMarketDto>>(cacheKey, ct);
+            if (cached is not null)
+            {
+                _logger.LogDebug("Cache hit for {CacheKey}", cacheKey);
+                return Result.Success<IReadOnlyList<CryptoMarketDto>>(cached);
+            }
+
+            var records = await _cryptoMarketProvider.GetMarketOverviewAsync("usd", clampedLimit, ct);
+
+            var dtos = records.Select(r => new CryptoMarketDto
+            {
+                Id = r.Id,
+                Symbol = r.Symbol,
+                Name = r.Name,
+                Image = r.Image,
+                CurrentPrice = r.CurrentPrice,
+                MarketCap = r.MarketCap,
+                MarketCapRank = r.MarketCapRank,
+                TotalVolume = r.TotalVolume,
+                PriceChangePercent24H = r.PriceChangePercent24H,
+                Ath = r.Ath,
+                AthChangePercent = r.AthChangePercent,
+                CirculatingSupply = r.CirculatingSupply
+            }).ToList();
+
+            // Shorter TTL for live market data
+            await _cache.SetAsync(cacheKey, dtos, TimeSpan.FromMinutes(2), ct);
+            return Result.Success<IReadOnlyList<CryptoMarketDto>>(dtos);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get crypto market overview");
+            return Result.Failure<IReadOnlyList<CryptoMarketDto>>(
+                new Error("Dashboard.CryptoMarketOverview", ex.Message));
+        }
+    }
+
+    public async Task<Result<IReadOnlyList<RiskMetricsDto>>> GetRiskMetricsAsync(int days, CancellationToken ct)
+    {
+        try
+        {
+            var clampedDays = Math.Clamp(days, 30, 365);
+            var cacheKey = $"mart:risk:{clampedDays}";
+
+            var cached = await _cache.GetAsync<List<RiskMetricsDto>>(cacheKey, ct);
+            if (cached is not null)
+            {
+                _logger.LogDebug("Cache hit for {CacheKey}", cacheKey);
+                return Result.Success<IReadOnlyList<RiskMetricsDto>>(cached);
+            }
+
+            var records = await _martReader.GetRiskMetricsAsync(clampedDays, ct);
+
+            var dtos = records.Select(r => new RiskMetricsDto
+            {
+                Ticker = r.Ticker,
+                Name = r.Name,
+                AssetType = r.AssetType,
+                SharpeRatio = r.SharpeRatio,
+                MaxDrawdown = r.MaxDrawdown,
+                AnnualisedVolatility = r.AnnualisedVolatility,
+                MeanDailyReturn = r.MeanDailyReturn,
+                TradingDays = r.TradingDays
+            }).ToList();
+
+            await _cache.SetAsync(cacheKey, dtos, DefaultCacheTtl, ct);
+            return Result.Success<IReadOnlyList<RiskMetricsDto>>(dtos);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get risk metrics");
+            return Result.Failure<IReadOnlyList<RiskMetricsDto>>(
+                new Error("Dashboard.RiskMetrics", ex.Message));
         }
     }
 }

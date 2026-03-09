@@ -280,4 +280,52 @@ public class ClickHouseDataMartReader : IDataMartReader
 
         return results;
     }
+
+    public async Task<IReadOnlyList<RiskMetricsRecord>> GetRiskMetricsAsync(int days, CancellationToken ct)
+    {
+        const string sql = """
+            SELECT
+                a.Ticker,
+                a.Name,
+                a.AssetType,
+                d.FullDate AS Date,
+                fq.ClosePrice AS Close
+            FROM dwh.FactQuotes fq
+            INNER JOIN dwh.DimAssets a ON a.AssetKey = fq.AssetKey
+            INNER JOIN dwh.DimDates  d ON d.DateKey  = fq.DateKey
+            WHERE a.IsActive = 1
+              AND d.FullDate >= today() - {days:Int32}
+            ORDER BY a.Ticker, d.FullDate
+            """;
+
+        using var connection = new ClickHouseConnection(_connectionString);
+        await connection.OpenAsync(ct);
+
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = sql;
+        cmd.AddParameter("days", days);
+
+        var grouped = new Dictionary<string, (string Name, string AssetType, List<decimal> Closes)>();
+
+        using var reader = await cmd.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+        {
+            var ticker = reader.GetString(0);
+            var name = reader.GetString(1);
+            var assetType = reader.GetString(2);
+            var close = reader.GetDecimal(4);
+
+            if (!grouped.TryGetValue(ticker, out var entry))
+            {
+                entry = (name, assetType, []);
+                grouped[ticker] = entry;
+            }
+            entry.Closes.Add(close);
+        }
+
+        return grouped
+            .Select(kv => DapperDataMartReader.CalculateRiskMetricsPublic(kv.Key, kv.Value.Name, kv.Value.AssetType, kv.Value.Closes))
+            .OrderBy(r => r.Ticker)
+            .ToList();
+    }
 }

@@ -208,4 +208,109 @@ public class DapperDataMartReader : IDataMartReader
             new CommandDefinition(sql, cancellationToken: ct));
         return results.ToList();
     }
+
+    public async Task<IReadOnlyList<RiskMetricsRecord>> GetRiskMetricsAsync(int days, CancellationToken ct)
+    {
+        // Pull raw daily closes per asset within the window, then compute
+        // Sharpe Ratio and Max Drawdown in application memory.
+        // This avoids complex SQL STDDEV / LAG expressions that differ across dialects,
+        // and the dataset (≤ 365 rows × N assets) fits comfortably in memory.
+        var sql = _isPostgreSql
+            ? """
+              SELECT
+                  a."Ticker",
+                  a."Name",
+                  a."AssetType",
+                  d."FullDate" AS "Date",
+                  fq."ClosePrice" AS "Close"
+              FROM dwh."FactQuotes" fq
+              INNER JOIN dwh."DimAssets" a  ON a."AssetKey"  = fq."AssetKey"
+              INNER JOIN dwh."DimDates"  d  ON d."DateKey"   = fq."DateKey"
+              WHERE a."IsActive" = true
+                AND d."FullDate" >= CURRENT_DATE - @Days
+              ORDER BY a."Ticker", d."FullDate"
+              """
+            : """
+              SELECT
+                  a.Ticker,
+                  a.Name,
+                  a.AssetType,
+                  d.FullDate AS [Date],
+                  fq.ClosePrice AS [Close]
+              FROM dwh.FactQuotes fq
+              INNER JOIN dwh.DimAssets a  ON a.AssetKey  = fq.AssetKey
+              INNER JOIN dwh.DimDates  d  ON d.DateKey   = fq.DateKey
+              WHERE a.IsActive = 1
+                AND d.FullDate >= DATEADD(DAY, -@Days, GETDATE())
+              ORDER BY a.Ticker, d.FullDate
+              """;
+
+        using var connection = _connectionFactory.CreateConnection();
+        var rows = await connection.QueryAsync<(string Ticker, string Name, string AssetType, DateOnly Date, decimal Close)>(
+            new CommandDefinition(sql, new { Days = days }, cancellationToken: ct));
+
+        return rows
+            .GroupBy(r => r.Ticker)
+            .Select(g => CalculateRiskMetrics(g.Key, g.First().Name, g.First().AssetType, g.Select(r => r.Close).ToList()))
+            .OrderBy(r => r.Ticker)
+            .ToList();
+    }
+
+    private static RiskMetricsRecord CalculateRiskMetrics(
+        string ticker, string name, string assetType, IList<decimal> closes)
+    {
+        return CalculateRiskMetricsPublic(ticker, name, assetType, closes);
+    }
+
+    internal static RiskMetricsRecord CalculateRiskMetricsPublic(
+        string ticker, string name, string assetType, IList<decimal> closes)
+    {
+        if (closes.Count < 2)
+        {
+            return new RiskMetricsRecord { Ticker = ticker, Name = name, AssetType = assetType, TradingDays = closes.Count };
+        }
+
+        // Daily log returns
+        var returns = new List<double>(closes.Count - 1);
+        for (var i = 1; i < closes.Count; i++)
+        {
+            if (closes[i - 1] != 0)
+                returns.Add((double)(closes[i] / closes[i - 1]) - 1.0);
+        }
+
+        if (returns.Count == 0)
+            return new RiskMetricsRecord { Ticker = ticker, Name = name, AssetType = assetType, TradingDays = closes.Count };
+
+        var mean = returns.Average();
+        var variance = returns.Sum(r => Math.Pow(r - mean, 2)) / returns.Count;
+        var stdDev = Math.Sqrt(variance);
+
+        // Annualise: multiply by √252 (trading days per year)
+        var annualisedVol = stdDev * Math.Sqrt(252);
+        var annualisedReturn = mean * 252;
+        var sharpe = annualisedVol > 0 ? annualisedReturn / annualisedVol : 0;
+
+        // Max Drawdown: largest peak-to-trough decline
+        var peak = (double)closes[0];
+        var maxDrawdown = 0.0;
+        foreach (var close in closes)
+        {
+            var c = (double)close;
+            if (c > peak) peak = c;
+            var drawdown = peak > 0 ? (c - peak) / peak : 0;
+            if (drawdown < maxDrawdown) maxDrawdown = drawdown;
+        }
+
+        return new RiskMetricsRecord
+        {
+            Ticker = ticker,
+            Name = name,
+            AssetType = assetType,
+            SharpeRatio = Math.Round((decimal)sharpe, 2),
+            MaxDrawdown = Math.Round((decimal)(maxDrawdown * 100), 2),
+            AnnualisedVolatility = Math.Round((decimal)(annualisedVol * 100), 2),
+            MeanDailyReturn = Math.Round((decimal)(mean * 100), 4),
+            TradingDays = closes.Count
+        };
+    }
 }

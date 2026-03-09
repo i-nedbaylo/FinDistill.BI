@@ -1,6 +1,7 @@
 using FinDistill.Application.Interfaces;
 using FinDistill.Web.ViewModels;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 
 namespace FinDistill.Web.Controllers;
 
@@ -55,5 +56,37 @@ public class AnalyticsController : Controller
         };
 
         return View(viewModel);
+    }
+
+    /// <summary>Renders the live Crypto Market Overview table with dominance chart.</summary>
+    public async Task<IActionResult> CryptoMarket(int limit = 20, CancellationToken ct = default)
+    {
+        var clampedLimit = Math.Clamp(limit, 5, 100);
+        var result = await _dashboardService.GetCryptoMarketOverviewAsync(clampedLimit, ct);
+
+        if (result.IsFailure)
+            _logger.LogWarning("Failed to load crypto market overview: {Error}", result.Error.Message);
+
+        return View(new CryptoMarketViewModel
+        {
+            Limit = clampedLimit,
+            Coins = result.IsSuccess ? result.Value : []
+        });
+    }
+
+    /// <summary>Renders the Risk Analytics report: Sharpe Ratio + Max Drawdown.</summary>
+    public async Task<IActionResult> Risk(int days = 365, CancellationToken ct = default)
+    {
+        var clampedDays = Math.Clamp(days, 30, 365);
+        var result = await _dashboardService.GetRiskMetricsAsync(clampedDays, ct);
+
+        if (result.IsFailure)
+            _logger.LogWarning("Failed to load risk metrics: {Error}", result.Error.Message);
+
+        return View(new RiskMetricsViewModel
+        {
+            Days = clampedDays,
+            Metrics = result.IsSuccess ? result.Value : []
+        });
     }
 }

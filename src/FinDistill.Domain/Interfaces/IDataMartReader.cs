@@ -27,4 +27,12 @@ public interface IDataMartReader
 
     /// <summary>Reads 52-week high/low screener data for all active assets.</summary>
     Task<IReadOnlyList<Week52HighLowRecord>> GetWeek52HighLowAsync(CancellationToken ct);
+
+    /// <summary>
+    /// Calculates Sharpe Ratio, Maximum Drawdown and annualised volatility
+    /// from stored FactQuotes for all active assets.
+    /// </summary>
+    /// <param name="days">Number of calendar days to include in the calculation window.</param>
+    /// <param name="ct">Cancellation token.</param>
+    Task<IReadOnlyList<RiskMetricsRecord>> GetRiskMetricsAsync(int days, CancellationToken ct);
 }
