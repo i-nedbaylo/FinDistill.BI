@@ -14,11 +14,13 @@
 5. [Data Architecture (3-Tier)](#5-data-architecture-3-tier)
 6. [ETL Pipeline](#6-etl-pipeline)
 7. [Configuration Reference](#7-configuration-reference)
-8. [Running the Application](#8-running-the-application)
-9. [Testing Strategy](#9-testing-strategy)
-10. [CI/CD Pipeline](#10-cicd-pipeline)
-11. [Simplifications (Educational/Demo Scope)](#11-simplifications-educationaldemo-scope)
-12. [Production Hardening Roadmap](#12-production-hardening-roadmap)
+8. [Optional Configuration Guide](#8-optional-configuration-guide)
+9. [Running the Application](#9-running-the-application)
+10. [Testing Strategy](#10-testing-strategy)
+11. [CI/CD Pipeline](#11-cicd-pipeline)
+12. [Deployment](#12-deployment)
+13. [Simplifications (Educational/Demo Scope)](#13-simplifications-educationaldemo-scope)
+14. [Production Hardening Roadmap](#14-production-hardening-roadmap)
 
 ---
 
@@ -269,7 +271,390 @@ API keys should be stored in `appsettings.Development.json` (excluded from git v
 
 ---
 
-## 8. Running the Application
+## 8. Optional Configuration Guide
+
+This section provides step-by-step instructions for every optional setting in the application. All options use the **Options Pattern** (`IOptions<T>`) and can be set via `appsettings.json`, `appsettings.{Environment}.json`, environment variables, or User Secrets.
+
+> **Environment variable naming:** Replace `:` with `__` (double underscore). Arrays use indexed notation: `Tickers__0`, `Tickers__1`, etc.
+
+---
+
+### 8.1 Switch Database Provider (SQL Server ↔ PostgreSQL)
+
+**Options class:** `DatabaseOptions` — section `"Database"`
+
+The application supports both SQL Server and PostgreSQL. All layers (EF Core, Dapper, Data Mart readers) respect this single setting.
+
+**Step 1:** Change the provider in `appsettings.json`:
+
+```jsonc
+{
+  "Database": {
+    "Provider": "PostgreSQL"  // "SqlServer" (default) or "PostgreSQL"
+  }
+}
+```
+
+**Step 2:** Update the connection string:
+
+```jsonc
+{
+  "ConnectionStrings": {
+    // SQL Server
+    "DefaultConnection": "Server=localhost;Database=FinDistillBI;Trusted_Connection=True;TrustServerCertificate=True;"
+
+    // PostgreSQL
+    "DefaultConnection": "Host=localhost;Port=5432;Database=findistill;Username=postgres;Password=your_password;"
+  }
+}
+```
+
+**Step 3:** Apply EF Core migrations for the chosen provider:
+
+```bash
+dotnet ef database update --project src/FinDistill.Web
+```
+
+**Via environment variables:**
+
+```bash
+Database__Provider=PostgreSQL
+ConnectionStrings__DefaultConnection="Host=localhost;Port=5432;Database=findistill;..."
+```
+
+---
+
+### 8.2 Auto-Migrate on Startup
+
+**Options class:** `DatabaseOptions` — property `AutoMigrate`
+
+When enabled, EF Core migrations are applied automatically when the Web application starts. Useful for cloud deployments where you cannot run `dotnet ef` manually.
+
+```jsonc
+{
+  "Database": {
+    "Provider": "PostgreSQL",
+    "AutoMigrate": true  // default: false (safe-by-default)
+  }
+}
+```
+
+> ⚠️ **Warning:** Do not enable in multi-instance deployments — concurrent migrations can corrupt the database. Use only for single-instance deployments (Railway, Render, local Docker).
+
+**Via environment variable:**
+
+```bash
+Database__AutoMigrate=true
+```
+
+---
+
+### 8.3 Configure Data Sources
+
+**Options class:** `DataSourcesOptions` — section `"DataSources"`
+
+#### 8.3.1 Yahoo Finance
+
+```jsonc
+{
+  "DataSources": {
+    "YahooFinance": {
+      "Enabled": true,                              // Enable/disable this source
+      "Tickers": ["AAPL", "MSFT", "GOOGL", "TSLA"], // Stock/ETF ticker symbols
+      "RequestDelayMs": 1000                         // Delay between requests (ms) to avoid HTTP 429
+    }
+  }
+}
+```
+
+To add more tickers, simply extend the array. To disable Yahoo Finance entirely, set `Enabled` to `false`.
+
+**Via environment variables (indexed notation for arrays):**
+
+```bash
+DataSources__YahooFinance__Enabled=true
+DataSources__YahooFinance__Tickers__0=AAPL
+DataSources__YahooFinance__Tickers__1=MSFT
+DataSources__YahooFinance__Tickers__2=GOOGL
+DataSources__YahooFinance__RequestDelayMs=1000
+```
+
+#### 8.3.2 CoinGecko
+
+```jsonc
+{
+  "DataSources": {
+    "CoinGecko": {
+      "Enabled": true,                    // Enable/disable this source
+      "CoinIds": ["bitcoin", "ethereum", "solana"],  // CoinGecko coin identifiers
+      "VsCurrency": "usd",                // Quote currency (usd, eur, etc.)
+      "ApiKey": null,                     // Demo API key (see below)
+      "RequestDelayMs": 1500              // Delay between requests (ms)
+    }
+  }
+}
+```
+
+**Getting a CoinGecko API key (recommended):**
+
+1. Register at [coingecko.com/developers/dashboard](https://www.coingecko.com/en/developers/dashboard)
+2. Create a **Demo API key** (free, rate-limited)
+3. Store it securely — **never commit to git**:
+
+```bash
+# Option A: User Secrets (development)
+dotnet user-secrets set "DataSources:CoinGecko:ApiKey" "CG-your_key_here" --project src/FinDistill.Web
+dotnet user-secrets set "DataSources:CoinGecko:ApiKey" "CG-your_key_here" --project src/FinDistill.Worker
+
+# Option B: appsettings.Development.json (excluded via .gitignore)
+# { "DataSources": { "CoinGecko": { "ApiKey": "CG-your_key_here" } } }
+
+# Option C: Environment variable
+DataSources__CoinGecko__ApiKey=CG-your_key_here
+```
+
+**Via environment variables (indexed notation for arrays):**
+
+```bash
+DataSources__CoinGecko__Enabled=true
+DataSources__CoinGecko__CoinIds__0=bitcoin
+DataSources__CoinGecko__CoinIds__1=ethereum
+DataSources__CoinGecko__CoinIds__2=solana
+DataSources__CoinGecko__VsCurrency=usd
+```
+
+---
+
+### 8.4 Configure ETL Schedule
+
+**Options class:** `EtlScheduleOptions` — section `"EtlSchedule"`
+
+Controls how often the ETL pipeline runs (in both the dedicated Worker service and the in-process ETL worker).
+
+```jsonc
+{
+  "EtlSchedule": {
+    "IntervalMinutes": 30,   // Run ETL every 30 minutes (default: 15)
+    "CronExpression": null   // Reserved for future use
+  }
+}
+```
+
+**Via environment variable:**
+
+```bash
+EtlSchedule__IntervalMinutes=30
+```
+
+---
+
+### 8.5 Enable In-Process ETL Worker
+
+**Options class:** `FeaturesOptions` — property `RunEtlInProcess`
+
+Runs the ETL pipeline inside the Web process as a `BackgroundService`. This eliminates the need for the separate Worker service — useful for free hosting tiers (Render.com) that only allow a single process.
+
+```jsonc
+{
+  "Features": {
+    "RunEtlInProcess": true  // default: false
+  }
+}
+```
+
+**Deployment modes:**
+
+| `RunEtlInProcess` | Web | Worker | Use case |
+|---|---|---|---|
+| `false` (default) | HTTP only | ETL only | Production: two separate processes |
+| `true` | HTTP + ETL | Not needed | Demo/free tier: single process |
+
+When `RunEtlInProcess` is `true`, the `EtlSchedule` section must also be present in the Web project's `appsettings.json` (already included by default).
+
+**Via environment variable:**
+
+```bash
+Features__RunEtlInProcess=true
+```
+
+---
+
+### 8.6 Enable ClickHouse for Data Marts (Optional)
+
+**Options class:** `FeaturesOptions` — property `UseClickHouse`
+
+Replaces Dapper (SQL Server/PostgreSQL) with ClickHouse as the read engine for Data Mart queries. ClickHouse provides superior analytical query performance for large datasets.
+
+**Step 1:** Set up a ClickHouse instance and create tables:
+
+```bash
+# Apply the DDL script to your ClickHouse instance
+clickhouse-client --multiquery < Scripts/ClickHouse_DDL.sql
+```
+
+**Step 2:** Configure the connection:
+
+```jsonc
+{
+  "ConnectionStrings": {
+    "ClickHouse": "Host=localhost;Port=8123;Database=default;"
+  },
+  "Features": {
+    "UseClickHouse": true  // default: false
+  }
+}
+```
+
+**What changes when enabled:**
+
+| Component | `UseClickHouse = false` | `UseClickHouse = true` |
+|---|---|---|
+| `IDataMartReader` | `DapperDataMartReader` | `ClickHouseDataMartReader` |
+| `IClickHouseSyncService` | Not registered | `ClickHouseSyncService` |
+| ETL pipeline | E → T → L | E → T → L → ClickHouse Sync |
+
+**Via environment variables:**
+
+```bash
+Features__UseClickHouse=true
+ConnectionStrings__ClickHouse="Host=clickhouse-server;Port=8123;Database=default;"
+```
+
+---
+
+### 8.7 Enable Redis Caching (Optional — Interface Ready)
+
+**Options class:** `FeaturesOptions` — property `UseRedis`
+
+The `ICacheService` interface and `NullCacheService` (no-op) are already implemented. Redis integration (`RedisCacheService`) is planned for Phase 10.
+
+```jsonc
+{
+  "ConnectionStrings": {
+    "Redis": "localhost:6379"  // Required when UseRedis = true
+  },
+  "Features": {
+    "UseRedis": true  // default: false
+  }
+}
+```
+
+| `UseRedis` | `ICacheService` implementation | Behavior |
+|---|---|---|
+| `false` (default) | `NullCacheService` | All cache calls return `null` — transparent pass-through |
+| `true` | `RedisCacheService` (Phase 10) | Cache-aside pattern for Data Mart reads |
+
+---
+
+### 8.8 Configure Serilog Logging
+
+**Serilog** is configured via the `"Serilog"` section in `appsettings.json`. The application uses structured logging with Console and rolling File sinks.
+
+**Development (Console + File):**
+
+```jsonc
+{
+  "Serilog": {
+    "MinimumLevel": {
+      "Default": "Debug",
+      "Override": {
+        "Microsoft.AspNetCore": "Warning",
+        "Microsoft.EntityFrameworkCore": "Information"
+      }
+    }
+  }
+}
+```
+
+**Production / Container (Console only):**
+
+File logging is automatically disabled in the `Production` environment to avoid issues with ephemeral/read-only container filesystems.
+
+```jsonc
+{
+  "Serilog": {
+    "MinimumLevel": {
+      "Default": "Information",
+      "Override": {
+        "Microsoft.AspNetCore": "Warning",
+        "Microsoft.EntityFrameworkCore": "Warning",
+        "Microsoft.EntityFrameworkCore.Database.Command": "Warning"
+      }
+    },
+    "WriteTo": [
+      { "Name": "Console" }
+    ]
+  }
+}
+```
+
+---
+
+### 8.9 Quick Reference — All Configuration Sections
+
+| Section | Options Class | Key Properties | Default |
+|---|---|---|---|
+| `Database` | `DatabaseOptions` | `Provider`, `AutoMigrate` | `"SqlServer"`, `false` |
+| `Features` | `FeaturesOptions` | `UseRedis`, `UseClickHouse`, `RunEtlInProcess` | all `false` |
+| `EtlSchedule` | `EtlScheduleOptions` | `IntervalMinutes`, `CronExpression` | `15`, `null` |
+| `DataSources:YahooFinance` | `YahooFinanceOptions` | `Enabled`, `Tickers`, `RequestDelayMs` | `true`, `[]`, `1000` |
+| `DataSources:CoinGecko` | `CoinGeckoOptions` | `Enabled`, `CoinIds`, `VsCurrency`, `ApiKey`, `RequestDelayMs` | `true`, `[]`, `"usd"`, `null`, `1500` |
+| `ConnectionStrings` | — | `DefaultConnection`, `ClickHouse`, `Redis` | — |
+| `Serilog` | — | `MinimumLevel`, `WriteTo` | `Information`, Console + File |
+
+---
+
+### 8.10 Example: Minimal Configuration for Render.com (Free Tier)
+
+Single-process deployment with PostgreSQL, in-process ETL, and no optional features:
+
+```jsonc
+// appsettings.Production.json (or environment variables)
+{
+  "Database": {
+    "Provider": "PostgreSQL",
+    "AutoMigrate": true
+  },
+  "Features": {
+    "UseRedis": false,
+    "UseClickHouse": false,
+    "RunEtlInProcess": true
+  },
+  "EtlSchedule": {
+    "IntervalMinutes": 15
+  },
+  "DataSources": {
+    "YahooFinance": {
+      "Enabled": true,
+      "Tickers": ["AAPL", "MSFT"]
+    },
+    "CoinGecko": {
+      "Enabled": true,
+      "CoinIds": ["bitcoin"],
+      "VsCurrency": "usd"
+    }
+  }
+}
+```
+
+Equivalent environment variables:
+
+```bash
+Database__Provider=PostgreSQL
+Database__AutoMigrate=true
+Features__RunEtlInProcess=true
+EtlSchedule__IntervalMinutes=15
+DataSources__YahooFinance__Enabled=true
+DataSources__YahooFinance__Tickers__0=AAPL
+DataSources__YahooFinance__Tickers__1=MSFT
+DataSources__CoinGecko__Enabled=true
+DataSources__CoinGecko__CoinIds__0=bitcoin
+DataSources__CoinGecko__VsCurrency=usd
+```
+
+---
+
+## 9. Running the Application
 
 ### Prerequisites
 
@@ -302,7 +687,7 @@ Change `Database:Provider` to `"PostgreSQL"` and update `ConnectionStrings:Defau
 
 ---
 
-## 9. Testing Strategy
+## 10. Testing Strategy
 
 ### Unit tests (73 tests)
 
@@ -329,7 +714,7 @@ Uses **Testcontainers** (SQL Server + PostgreSQL) with `[DockerAvailableFact]` �
 
 ---
 
-## 10. CI/CD Pipeline
+## 11. CI/CD Pipeline
 
 Automated via GitHub Actions (`.github/workflows/ci-cd.yml`).
 
@@ -375,11 +760,112 @@ dotnet test --filter "FullyQualifiedName~IntegrationTests"
 
 ---
 
-## 11. Simplifications (Educational/Demo Scope)
+## 12. Deployment
+
+The application includes ready-to-use deployment configurations for **Railway.app** and **Render.com**, plus general guidelines for production environments.
+
+### 12.1 Railway.app (Two-Process Deployment)
+
+Railway supports deploying multiple services from a single repository. Configuration is defined in `railway.toml`.
+
+**Architecture:** Web + Worker as separate services + managed PostgreSQL.
+
+```
+┌─────────────────────────────────────────┐
+│  Railway Project                        │
+│  ┌──────────────┐  ┌────────────────┐   │
+│  │ findistill-  │  │ findistill-    │   │
+│  │ web          │  │ worker         │   │
+│  │ (Dockerfile) │  │ (Dockerfile)   │   │
+│  └──────┬───────┘  └───────┬────────┘   │
+│         │                  │            │
+│         └────────┬─────────┘            │
+│                  ▼                      │
+│         ┌──────────────┐                │
+│         │  PostgreSQL  │                │
+│         │  (managed)   │                │
+│         └──────────────┘                │
+└─────────────────────────────────────────┘
+```
+
+**Setup steps:**
+
+1. Create a new Railway project → **Deploy from GitHub repo** → select `FinDistill.BI`
+2. Add PostgreSQL: **+ New** → **Database** → **Add PostgreSQL**
+3. Configure `findistill-web` service: Settings → Dockerfile Path → `src/FinDistill.Web/Dockerfile`
+4. Add `findistill-worker` service: **+ New** → **GitHub Repo** → same repo → Dockerfile Path → `src/FinDistill.Worker/Dockerfile`
+5. Set environment variables for both services (indexed notation for arrays):
+
+```bash
+ConnectionStrings__DefaultConnection    = ${{Postgres.DATABASE_URL}}
+Database__Provider                      = PostgreSQL
+Database__AutoMigrate                   = true
+DataSources__YahooFinance__Enabled      = true
+DataSources__YahooFinance__Tickers__0   = AAPL
+DataSources__YahooFinance__Tickers__1   = MSFT
+DataSources__YahooFinance__Tickers__2   = SPY
+DataSources__YahooFinance__Tickers__3   = QQQ
+DataSources__CoinGecko__Enabled         = true
+DataSources__CoinGecko__CoinIds__0      = bitcoin
+DataSources__CoinGecko__CoinIds__1      = ethereum
+DataSources__CoinGecko__VsCurrency      = usd
+Features__UseRedis                      = false
+Features__UseClickHouse                 = false
+```
+
+> ⚠️ Railway is a **paid service** ($5/month Hobby plan or trial credits).
+
+### 12.2 Render.com (Single-Process — Free Tier)
+
+Render supports a single free web service with a managed PostgreSQL database (free for 90 days). Configuration is defined in `render.yaml`.
+
+**Architecture:** Web with in-process ETL (`RunEtlInProcess = true`).
+
+```
+┌──────────────────────────┐
+│  Render Project          │
+│  ┌────────────────────┐  │
+│  │ findistill-web     │  │
+│  │ (HTTP + ETL)       │  │
+│  │ RunEtlInProcess=   │  │
+│  │ true               │  │
+│  └─────────┬──────────┘  │
+│            ▼             │
+│  ┌────────────────────┐  │
+│  │ PostgreSQL (free)  │  │
+│  └────────────────────┘  │
+└──────────────────────────┘
+```
+
+**Setup steps:**
+
+1. Create a new Render project → **Blueprint** → select `FinDistill.BI` repository
+2. Render reads `render.yaml` and auto-creates the Web service + PostgreSQL database
+3. Link the database: Dashboard → Service → **Environment** → connect `DATABASE_URL` to the database
+
+The `render.yaml` already includes all required environment variables with `Features__RunEtlInProcess=true`.
+
+> **Note:** Render injects `DATABASE_URL` in `postgres://user:pass@host:port/db` format. `Program.cs` automatically converts this to Npgsql connection string format.
+
+> **Note:** Render uses a dynamic `$PORT` at runtime. The Dockerfile uses a shell-form `CMD` to support this: `CMD ["sh", "-c", "dotnet FinDistill.Web.dll --urls http://+:${PORT:-8080}"]`
+
+### 12.3 General Production Guidelines
+
+| Area | Recommendation |
+|---|---|
+| Database | Use SQL Server or PostgreSQL with automatic backups and appropriate performance tier |
+| Hosting | Host Web and Worker as separate services; configure scaling based on CPU/memory |
+| Networking | Use virtual network isolation; restrict database access to known IPs |
+| Security | Enable HTTPS/HSTS; use managed identities or Key Vault for secrets; rotate credentials |
+| Monitoring | Enable Application Insights or OpenTelemetry for real-time diagnostics and alerts |
+
+---
+
+## 13. Simplifications (Educational/Demo Scope)
 
 The following design decisions were made deliberately to keep the project focused on demonstrating architectural patterns rather than production-readiness:
 
-### 11.1 Security
+### 13.1 Security
 
 | Simplification | Production expectation |
 |---|---|
@@ -388,7 +874,7 @@ The following design decisions were made deliberately to keep the project focuse
 | CSRF protection on Sync only | Consistent anti-forgery across all mutations |
 | API keys in `appsettings.Development.json` | Azure Key Vault / AWS Secrets Manager |
 
-### 11.2 Data processing
+### 13.2 Data processing
 
 | Simplification | Production expectation |
 |---|---|
@@ -398,7 +884,7 @@ The following design decisions were made deliberately to keep the project focuse
 | No data retention policy | TTL-based purging of Data Lake records |
 | `SaveChangesAsync` per dimension upsert | Bulk upsert via `ExecuteUpdateAsync` batching |
 
-### 11.3 Infrastructure
+### 13.3 Infrastructure
 
 | Simplification | Production expectation |
 |---|---|
@@ -407,7 +893,7 @@ The following design decisions were made deliberately to keep the project focuse
 | No containerization | Dockerfile + docker-compose |
 | No telemetry/metrics | OpenTelemetry + Prometheus/Grafana |
 
-### 11.4 API resilience
+### 13.4 API resilience
 
 | Simplification | Production expectation |
 |---|---|
@@ -416,7 +902,7 @@ The following design decisions were made deliberately to keep the project focuse
 | Static 1–1.5s inter-request delay | Adaptive rate limiting based on API response headers |
 | Yahoo Finance v8 undocumented API | Official API with SLA or paid data provider |
 
-### 11.5 Frontend
+### 13.5 Frontend
 
 | Simplification | Production expectation |
 |---|---|
@@ -427,7 +913,7 @@ The following design decisions were made deliberately to keep the project focuse
 
 ---
 
-## 12. Production Hardening Roadmap
+## 14. Production Hardening Roadmap
 
 ### Priority 1 — Security & reliability
 

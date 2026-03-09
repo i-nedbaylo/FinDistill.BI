@@ -24,7 +24,9 @@ try
         var userInfo = uri.UserInfo.Split(':', 2);
         if (userInfo.Length >= 2 && !string.IsNullOrEmpty(userInfo[0]))
         {
-            var npgsqlCs = $"Host={uri.Host};Port={uri.Port};Database={uri.AbsolutePath.TrimStart('/')};Username={userInfo[0]};Password={userInfo[1]};SSL Mode=Require;Trust Server Certificate=true";
+            var username = Uri.UnescapeDataString(userInfo[0]);
+            var password = Uri.UnescapeDataString(userInfo[1]);
+            var npgsqlCs = $"Host={uri.Host};Port={uri.Port};Database={uri.AbsolutePath.TrimStart('/')};Username={username};Password={password};SSL Mode=Require;Trust Server Certificate=true";
             builder.Configuration["ConnectionStrings:DefaultConnection"] = npgsqlCs;
         }
         else
