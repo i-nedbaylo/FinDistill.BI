@@ -17,10 +17,10 @@ public class Week52HighLowRecord
     /// <summary>Most recent closing price.</summary>
     public decimal LastClose { get; set; }
 
-    /// <summary>Highest closing price in the last 52 weeks (252 trading days).</summary>
+    /// <summary>Highest closing price in the last 52 weeks (365 calendar days).</summary>
     public decimal High52W { get; set; }
 
-    /// <summary>Lowest closing price in the last 52 weeks (252 trading days).</summary>
+    /// <summary>Lowest closing price in the last 52 weeks (365 calendar days).</summary>
     public decimal Low52W { get; set; }
 
     /// <summary>Percentage distance from the 52-week high: (LastClose - High52W) / High52W * 100.</summary>
