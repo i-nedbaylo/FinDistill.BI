@@ -21,9 +21,16 @@ try
     if (!string.IsNullOrEmpty(databaseUrl))
     {
         var uri = new Uri(databaseUrl);
-        var userInfo = uri.UserInfo.Split(':');
-        var npgsqlCs = $"Host={uri.Host};Port={uri.Port};Database={uri.AbsolutePath.TrimStart('/')};Username={userInfo[0]};Password={userInfo[1]};SSL Mode=Require;Trust Server Certificate=true";
-        builder.Configuration["ConnectionStrings:DefaultConnection"] = npgsqlCs;
+        var userInfo = uri.UserInfo.Split(':', 2);
+        if (userInfo.Length >= 2 && !string.IsNullOrEmpty(userInfo[0]))
+        {
+            var npgsqlCs = $"Host={uri.Host};Port={uri.Port};Database={uri.AbsolutePath.TrimStart('/')};Username={userInfo[0]};Password={userInfo[1]};SSL Mode=Require;Trust Server Certificate=true";
+            builder.Configuration["ConnectionStrings:DefaultConnection"] = npgsqlCs;
+        }
+        else
+        {
+            Log.Warning("DATABASE_URL is present but does not contain valid user information");
+        }
     }
 
     // Serilog — file sink only outside container environments
@@ -59,9 +66,12 @@ try
 
     var app = builder.Build();
 
-    // Auto-migrate on startup — guarded by config flag to allow disabling in multi-instance deployments
-    var runMigrations = builder.Configuration.GetValue("Database:AutoMigrate", defaultValue: true);
-    if (runMigrations)
+    // Auto-migrate on startup — guarded by config flag (Database:AutoMigrate)
+    var dbOptions = builder.Configuration
+        .GetSection(DatabaseOptions.SectionName)
+        .Get<DatabaseOptions>() ?? new DatabaseOptions();
+
+    if (dbOptions.AutoMigrate)
     {
         using var scope = app.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<FinDistillDbContext>();

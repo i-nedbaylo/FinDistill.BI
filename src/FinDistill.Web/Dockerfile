@@ -1,8 +1,6 @@
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
 WORKDIR /app
 EXPOSE 8080
-# Support both Railway (fixed 8080) and Render (dynamic $PORT)
-ENV ASPNETCORE_URLS=http://+:${PORT:-8080}
 ENV ASPNETCORE_ENVIRONMENT=Production
 
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
@@ -25,4 +23,6 @@ RUN dotnet publish "src/FinDistill.Web/FinDistill.Web.csproj" \
 FROM base AS final
 WORKDIR /app
 COPY --from=build /app/publish .
-ENTRYPOINT ["dotnet", "FinDistill.Web.dll"]
+# Shell-form CMD allows runtime $PORT substitution (Render.com injects PORT at runtime)
+# Falls back to 8080 for Railway and local Docker runs
+CMD ["sh", "-c", "dotnet FinDistill.Web.dll --urls http://+:${PORT:-8080}"]

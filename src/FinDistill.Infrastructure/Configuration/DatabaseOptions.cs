@@ -12,4 +12,11 @@ public class DatabaseOptions
     /// Database provider: "SqlServer" or "PostgreSQL".
     /// </summary>
     public string Provider { get; set; } = "SqlServer";
+
+    /// <summary>
+    /// When true, EF Core migrations are applied automatically on application startup.
+    /// Should be enabled only in single-instance deployments (e.g. Railway, Render).
+    /// Defaults to false (safe-by-default).
+    /// </summary>
+    public bool AutoMigrate { get; set; } = false;
 }

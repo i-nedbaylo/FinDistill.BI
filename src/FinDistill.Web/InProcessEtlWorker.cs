@@ -49,7 +49,7 @@ public class InProcessEtlWorker : BackgroundService
                         "In-process ETL: pipeline run finished with errors. Code: {Code}, Message: {Message}",
                         result.Error?.Code, result.Error?.Message);
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
                 break;
             }
@@ -58,7 +58,14 @@ public class InProcessEtlWorker : BackgroundService
                 _logger.LogError(ex, "In-process ETL: unhandled exception during pipeline run");
             }
 
-            await Task.Delay(interval, stoppingToken);
+            try
+            {
+                await Task.Delay(interval, stoppingToken);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
         }
 
         _logger.LogInformation("In-process ETL worker stopped");
