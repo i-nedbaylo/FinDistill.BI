@@ -25,4 +25,5 @@ WORKDIR /app
 COPY --from=build /app/publish .
 # Shell-form CMD allows runtime $PORT substitution (Render.com injects PORT at runtime)
 # Falls back to 8080 for Railway and local Docker runs
-CMD ["sh", "-c", "dotnet FinDistill.Web.dll --urls http://+:${PORT:-8080}"]
+# exec replaces sh with dotnet as PID 1 — ensures SIGTERM is forwarded for graceful shutdown
+CMD ["sh", "-c", "exec dotnet FinDistill.Web.dll --urls http://+:${PORT:-8080}"]
