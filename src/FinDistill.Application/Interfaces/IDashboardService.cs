@@ -27,4 +27,20 @@ public interface IDashboardService
 
     /// <summary>Returns 52-week high/low screener data for all active assets.</summary>
     Task<Result<IReadOnlyList<Week52HighLowDto>>> GetWeek52HighLowAsync(CancellationToken ct);
+
+    /// <summary>
+    /// Fetches live cryptocurrency market overview (top coins by market cap).
+    /// Data comes directly from CoinGecko /coins/markets — not from DWH.
+    /// </summary>
+    /// <param name="limit">Maximum number of coins to return (1–250).</param>
+    /// <param name="ct">Cancellation token.</param>
+    Task<Result<IReadOnlyList<CryptoMarketDto>>> GetCryptoMarketOverviewAsync(int limit, CancellationToken ct);
+
+    /// <summary>
+    /// Returns Sharpe Ratio, Max Drawdown and annualised volatility for all active assets.
+    /// Calculated from stored FactQuotes — no API call required.
+    /// </summary>
+    /// <param name="days">Number of calendar days to include in the calculation window.</param>
+    /// <param name="ct">Cancellation token.</param>
+    Task<Result<IReadOnlyList<RiskMetricsDto>>> GetRiskMetricsAsync(int days, CancellationToken ct);
 }

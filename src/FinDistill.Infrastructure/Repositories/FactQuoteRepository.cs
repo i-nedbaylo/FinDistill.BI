@@ -28,4 +28,15 @@ public class FactQuoteRepository : IFactQuoteRepository
         return await _context.FactQuotes
             .AnyAsync(q => q.AssetKey == assetKey && q.DateKey == dateKey && q.SourceKey == sourceKey, ct);
     }
+
+    public async Task<HashSet<(int AssetKey, int DateKey, int SourceKey)>> GetExistingKeysAsync(
+        int assetKey, int sourceKey, CancellationToken ct)
+    {
+        var keys = await _context.FactQuotes
+            .Where(q => q.AssetKey == assetKey && q.SourceKey == sourceKey)
+            .Select(q => new { q.AssetKey, q.DateKey, q.SourceKey })
+            .ToListAsync(ct);
+
+        return keys.Select(k => (k.AssetKey, k.DateKey, k.SourceKey)).ToHashSet();
+    }
 }

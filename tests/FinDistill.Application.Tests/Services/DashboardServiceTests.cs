@@ -11,9 +11,14 @@ public class DashboardServiceTests
 {
     private readonly Mock<IDataMartReader> _martReaderMock = new();
     private readonly Mock<ICacheService> _cacheMock = new();
+    private readonly Mock<ICryptoMarketProvider> _cryptoMarketProviderMock = new();
     private readonly Mock<ILogger<DashboardService>> _loggerMock = new();
 
-    private DashboardService CreateSut() => new(_martReaderMock.Object, _cacheMock.Object, _loggerMock.Object);
+    private DashboardService CreateSut() => new(
+        _martReaderMock.Object,
+        _cacheMock.Object,
+        _cryptoMarketProviderMock.Object,
+        _loggerMock.Object);
 
     [Fact]
     public async Task GetPortfolioSummaryAsync_CacheMiss_ReadsFromMart()
@@ -178,5 +183,118 @@ public class DashboardServiceTests
 
         Assert.True(result.IsFailure);
         Assert.Equal("Dashboard.Week52HighLow", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task GetCryptoMarketOverviewAsync_CacheMiss_FetchesFromProvider()
+    {
+        _cacheMock.Setup(c => c.GetAsync<List<CryptoMarketDto>>(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((List<CryptoMarketDto>?)null);
+
+        _cryptoMarketProviderMock
+            .Setup(p => p.GetMarketOverviewAsync("usd", 20, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<CryptoMarketRecord>
+            {
+                new() { Id = "bitcoin", Symbol = "BTC", Name = "Bitcoin", CurrentPrice = 60000, MarketCap = 1_200_000_000_000m, MarketCapRank = 1 }
+            });
+
+        var sut = CreateSut();
+        var result = await sut.GetCryptoMarketOverviewAsync(20, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Single(result.Value);
+        Assert.Equal("BTC", result.Value[0].Symbol);
+        _cryptoMarketProviderMock.Verify(p => p.GetMarketOverviewAsync("usd", 20, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetCryptoMarketOverviewAsync_CacheHit_SkipsProvider()
+    {
+        var cached = new List<CryptoMarketDto>
+        {
+            new() { Symbol = "ETH", Name = "Ethereum", CurrentPrice = 3000, MarketCapRank = 2 }
+        };
+        _cacheMock.Setup(c => c.GetAsync<List<CryptoMarketDto>>(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(cached);
+
+        var sut = CreateSut();
+        var result = await sut.GetCryptoMarketOverviewAsync(20, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Single(result.Value);
+        Assert.Equal("ETH", result.Value[0].Symbol);
+        _cryptoMarketProviderMock.Verify(p => p.GetMarketOverviewAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetCryptoMarketOverviewAsync_ProviderThrows_ReturnsFailure()
+    {
+        _cacheMock.Setup(c => c.GetAsync<List<CryptoMarketDto>>(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((List<CryptoMarketDto>?)null);
+        _cryptoMarketProviderMock
+            .Setup(p => p.GetMarketOverviewAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new HttpRequestException("API unreachable"));
+
+        var sut = CreateSut();
+        var result = await sut.GetCryptoMarketOverviewAsync(20, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Dashboard.CryptoMarketOverview", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task GetRiskMetricsAsync_CacheMiss_ReadsFromMart()
+    {
+        _cacheMock.Setup(c => c.GetAsync<List<RiskMetricsDto>>(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((List<RiskMetricsDto>?)null);
+
+        _martReaderMock.Setup(m => m.GetRiskMetricsAsync(365, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<RiskMetricsRecord>
+            {
+                new() { Ticker = "AAPL", Name = "Apple", AssetType = "Stock", SharpeRatio = 1.23m, MaxDrawdown = -18.5m, AnnualisedVolatility = 22.1m, MeanDailyReturn = 0.055m, TradingDays = 252 }
+            });
+
+        var sut = CreateSut();
+        var result = await sut.GetRiskMetricsAsync(365, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Single(result.Value);
+        Assert.Equal("AAPL", result.Value[0].Ticker);
+        Assert.Equal(1.23m, result.Value[0].SharpeRatio);
+        Assert.Equal(-18.5m, result.Value[0].MaxDrawdown);
+        _martReaderMock.Verify(m => m.GetRiskMetricsAsync(365, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetRiskMetricsAsync_CacheHit_SkipsMart()
+    {
+        var cached = new List<RiskMetricsDto>
+        {
+            new() { Ticker = "MSFT", SharpeRatio = 0.87m, MaxDrawdown = -15m }
+        };
+        _cacheMock.Setup(c => c.GetAsync<List<RiskMetricsDto>>(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(cached);
+
+        var sut = CreateSut();
+        var result = await sut.GetRiskMetricsAsync(365, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("MSFT", result.Value[0].Ticker);
+        _martReaderMock.Verify(m => m.GetRiskMetricsAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetRiskMetricsAsync_MartThrows_ReturnsFailure()
+    {
+        _cacheMock.Setup(c => c.GetAsync<List<RiskMetricsDto>>(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((List<RiskMetricsDto>?)null);
+        _martReaderMock.Setup(m => m.GetRiskMetricsAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("DB timeout"));
+
+        var sut = CreateSut();
+        var result = await sut.GetRiskMetricsAsync(365, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Dashboard.RiskMetrics", result.Error.Code);
     }
 }

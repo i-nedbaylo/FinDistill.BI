@@ -112,6 +112,15 @@ public static class InfrastructureServiceExtensions
             })
             .AddHttpMessageHandler<RetryDelegatingHandler>();
 
+        // CoinGecko market overview provider (separate from ETL provider)
+        services.AddHttpClient<CoinGeckoMarketProvider>(client =>
+            {
+                client.DefaultRequestHeaders.UserAgent.ParseAdd("FinDistill.BI/1.0");
+                client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+            })
+            .AddHttpMessageHandler<RetryDelegatingHandler>();
+        services.AddScoped<ICryptoMarketProvider>(sp => sp.GetRequiredService<CoinGeckoMarketProvider>());
+
         // Resolve IMarketDataProvider through the concrete type so that each provider
         // receives the HttpClient created by IHttpClientFactory (with retry handler attached).
         services.AddScoped<IMarketDataProvider>(sp => sp.GetRequiredService<YahooFinanceProvider>());
