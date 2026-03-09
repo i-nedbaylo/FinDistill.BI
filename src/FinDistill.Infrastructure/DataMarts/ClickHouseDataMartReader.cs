@@ -176,4 +176,108 @@ public class ClickHouseDataMartReader : IDataMartReader
 
         return results;
     }
+
+    public async Task<IReadOnlyList<ComparativeReturnRecord>> GetComparativeReturnsAsync(int days, CancellationToken ct)
+    {
+        const string sql = """
+            SELECT
+                a.Ticker,
+                d.FullDate AS Date,
+                fq.ClosePrice AS Close,
+                if(first_value(fq.ClosePrice) OVER (PARTITION BY a.AssetKey ORDER BY d.FullDate) = 0, 0,
+                   round(fq.ClosePrice / first_value(fq.ClosePrice) OVER (PARTITION BY a.AssetKey ORDER BY d.FullDate) * 100, 2)) AS NormalizedReturn
+            FROM dwh.FactQuotes fq
+            INNER JOIN dwh.DimAssets a ON a.AssetKey = fq.AssetKey
+            INNER JOIN dwh.DimDates d ON d.DateKey = fq.DateKey
+            WHERE a.IsActive = 1
+              AND d.FullDate >= today() - {days:Int32}
+            ORDER BY a.Ticker, d.FullDate
+            """;
+
+        var results = new List<ComparativeReturnRecord>();
+        using var connection = new ClickHouseConnection(_connectionString);
+        await connection.OpenAsync(ct);
+
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = sql;
+        cmd.AddParameter("days", days);
+
+        using var reader = await cmd.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+        {
+            results.Add(new ComparativeReturnRecord
+            {
+                Ticker = reader.GetString(0),
+                Date = DateOnly.FromDateTime(reader.GetDateTime(1)),
+                Close = reader.GetDecimal(2),
+                NormalizedReturn = reader.GetDecimal(3)
+            });
+        }
+
+        return results;
+    }
+
+    public async Task<IReadOnlyList<Week52HighLowRecord>> GetWeek52HighLowAsync(CancellationToken ct)
+    {
+        const string sql = """
+            WITH latest AS (
+                SELECT
+                    AssetKey,
+                    argMax(ClosePrice, DateKey) AS LastClose
+                FROM dwh.FactQuotes
+                GROUP BY AssetKey
+            ),
+            range52 AS (
+                SELECT
+                    fq.AssetKey,
+                    max(fq.ClosePrice) AS High52W,
+                    min(fq.ClosePrice) AS Low52W
+                FROM dwh.FactQuotes fq
+                INNER JOIN dwh.DimDates d ON d.DateKey = fq.DateKey
+                WHERE d.FullDate >= today() - 365
+                GROUP BY fq.AssetKey
+            )
+            SELECT
+                a.Ticker,
+                a.Name,
+                a.AssetType,
+                l.LastClose,
+                if(r.High52W IS NULL, l.LastClose, r.High52W) AS High52W,
+                if(r.Low52W IS NULL, l.LastClose, r.Low52W) AS Low52W,
+                if(ifNull(r.High52W, 0) = 0, 0,
+                   round((l.LastClose - r.High52W) / r.High52W * 100, 2)) AS PctFromHigh,
+                if(ifNull(r.Low52W, 0) = 0, 0,
+                   round((l.LastClose - r.Low52W) / r.Low52W * 100, 2)) AS PctFromLow
+            FROM dwh.DimAssets a
+            INNER JOIN latest l ON l.AssetKey = a.AssetKey
+            LEFT JOIN range52 r ON r.AssetKey = a.AssetKey
+            WHERE a.IsActive = 1
+            ORDER BY a.Ticker
+            """;
+
+        var results = new List<Week52HighLowRecord>();
+        using var connection = new ClickHouseConnection(_connectionString);
+        await connection.OpenAsync(ct);
+
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = sql;
+
+        using var reader = await cmd.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+        {
+            results.Add(new Week52HighLowRecord
+            {
+                Ticker = reader.GetString(0),
+                Name = reader.GetString(1),
+                AssetType = reader.GetString(2),
+                LastClose = reader.GetDecimal(3),
+                High52W = reader.GetDecimal(4),
+                Low52W = reader.GetDecimal(5),
+                PctFromHigh = reader.GetDecimal(6),
+                PctFromLow = reader.GetDecimal(7)
+            });
+        }
+
+        return results;
+    }
 }

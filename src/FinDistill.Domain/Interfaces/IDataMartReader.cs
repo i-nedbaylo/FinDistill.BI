@@ -19,4 +19,12 @@ public interface IDataMartReader
 
     /// <summary>Reads portfolio summary with last/previous close and change percentage.</summary>
     Task<IReadOnlyList<PortfolioSummaryRecord>> GetPortfolioSummaryAsync(CancellationToken ct);
+
+    /// <summary>Reads normalized comparative returns for all active assets over a number of days.</summary>
+    /// <param name="days">Number of calendar days to look back.</param>
+    /// <param name="ct">Cancellation token.</param>
+    Task<IReadOnlyList<ComparativeReturnRecord>> GetComparativeReturnsAsync(int days, CancellationToken ct);
+
+    /// <summary>Reads 52-week high/low screener data for all active assets.</summary>
+    Task<IReadOnlyList<Week52HighLowRecord>> GetWeek52HighLowAsync(CancellationToken ct);
 }

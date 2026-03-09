@@ -64,8 +64,27 @@ else
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"
             crossorigin="anonymous"></script>
     <script>
-        const labels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.History.Select(h => h.Date.ToString("yyyy-MM-dd"))));
-        const closes = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.History.Select(h => h.Close)));
+        const labels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.History.Reverse().Select(h => h.Date.ToString("yyyy-MM-dd"))));
+        const closes = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.History.Reverse().Select(h => h.Close)));
+
+        // Calculate SMA(20) — simple moving average over 20 data points
+        function calcSma(data, period) {
+            const sma = [];
+            for (let i = 0; i < data.length; i++) {
+                if (i < period - 1) {
+                    sma.push(null);
+                } else {
+                    let sum = 0;
+                    for (let j = i - period + 1; j <= i; j++) {
+                        sum += data[j];
+                    }
+                    sma.push(Math.round(sum / period * 100) / 100);
+                }
+            }
+            return sma;
+        }
+
+        const sma20 = calcSma(closes, 20);
 
         const ctx = document.getElementById('priceChart');
         if (ctx) {
@@ -73,17 +92,30 @@ else
                 type: 'line',
                 data: {
                     labels: labels,
-                    datasets: [{
-                        label: '@Model.Ticker Close Price',
-                        data: closes,
-                        borderColor: 'rgb(75, 192, 192)',
-                        backgroundColor: 'rgba(75, 192, 192, 0.1)',
-                        fill: true,
-                        tension: 0.3
-                    }]
+                    datasets: [
+                        {
+                            label: '@Model.Ticker Close Price',
+                            data: closes,
+                            borderColor: 'rgb(75, 192, 192)',
+                            backgroundColor: 'rgba(75, 192, 192, 0.1)',
+                            fill: true,
+                            tension: 0.3
+                        },
+                        {
+                            label: 'SMA(20)',
+                            data: sma20,
+                            borderColor: 'rgb(255, 159, 64)',
+                            backgroundColor: 'transparent',
+                            borderDash: [5, 5],
+                            tension: 0.3,
+                            pointRadius: 0,
+                            borderWidth: 2
+                        }
+                    ]
                 },
                 options: {
                     responsive: true,
+                    interaction: { mode: 'index', intersect: false },
                     plugins: {
                         legend: { display: true }
                     },

@@ -22,7 +22,7 @@ public class YahooFinanceOptions
     /// <summary>List of ticker symbols to fetch (e.g. "AAPL", "SPY").</summary>
     public List<string> Tickers { get; set; } = [];
     /// <summary>Delay between individual ticker requests in milliseconds to avoid HTTP 429.</summary>
-    public int RequestDelayMs { get; set; } = 1000;
+    public int RequestDelayMs { get; set; } = 2000;
 }
 
 /// <summary>Configuration for CoinGecko cryptocurrency data ingestion.</summary>

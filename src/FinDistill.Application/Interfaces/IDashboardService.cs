@@ -21,4 +21,10 @@ public interface IDashboardService
     /// <summary>Returns a portfolio summary with last close, previous close, and change for each asset.</summary>
     /// <param name="ct">Cancellation token.</param>
     Task<Result<IReadOnlyList<PortfolioSummaryDto>>> GetPortfolioSummaryAsync(CancellationToken ct);
+
+    /// <summary>Returns normalized comparative returns for all active assets over the specified number of days.</summary>
+    Task<Result<IReadOnlyList<ComparativeReturnDto>>> GetComparativeReturnsAsync(int days, CancellationToken ct);
+
+    /// <summary>Returns 52-week high/low screener data for all active assets.</summary>
+    Task<Result<IReadOnlyList<Week52HighLowDto>>> GetWeek52HighLowAsync(CancellationToken ct);
 }

@@ -146,4 +146,84 @@ public class DashboardService : IDashboardService
                 new Error("Dashboard.PortfolioSummary", ex.Message));
         }
     }
+
+    public async Task<Result<IReadOnlyList<ComparativeReturnDto>>> GetComparativeReturnsAsync(int days, CancellationToken ct)
+    {
+        try
+        {
+            var cacheKey = $"mart:compare:{days}";
+
+            var cached = await _cache.GetAsync<List<ComparativeReturnDto>>(cacheKey, ct);
+            if (cached is not null)
+            {
+                _logger.LogDebug("Cache hit for {CacheKey}", cacheKey);
+                return Result.Success<IReadOnlyList<ComparativeReturnDto>>(cached);
+            }
+
+            var records = await _martReader.GetComparativeReturnsAsync(days, ct);
+
+            var dtos = records.Select(r => new ComparativeReturnDto
+            {
+                Ticker = r.Ticker,
+                Date = r.Date,
+                Close = r.Close,
+                NormalizedReturn = r.NormalizedReturn
+            }).ToList();
+
+            await _cache.SetAsync(cacheKey, dtos, DefaultCacheTtl, ct);
+            return Result.Success<IReadOnlyList<ComparativeReturnDto>>(dtos);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get comparative returns");
+            return Result.Failure<IReadOnlyList<ComparativeReturnDto>>(
+                new Error("Dashboard.ComparativeReturns", ex.Message));
+        }
+    }
+
+    public async Task<Result<IReadOnlyList<Week52HighLowDto>>> GetWeek52HighLowAsync(CancellationToken ct)
+    {
+        try
+        {
+            const string cacheKey = "mart:52whl";
+
+            var cached = await _cache.GetAsync<List<Week52HighLowDto>>(cacheKey, ct);
+            if (cached is not null)
+            {
+                _logger.LogDebug("Cache hit for {CacheKey}", cacheKey);
+                return Result.Success<IReadOnlyList<Week52HighLowDto>>(cached);
+            }
+
+            var records = await _martReader.GetWeek52HighLowAsync(ct);
+
+            var dtos = records.Select(r => new Week52HighLowDto
+            {
+                Ticker = r.Ticker,
+                Name = r.Name,
+                AssetType = r.AssetType,
+                LastClose = r.LastClose,
+                High52W = r.High52W,
+                Low52W = r.Low52W,
+                PctFromHigh = r.PctFromHigh,
+                PctFromLow = r.PctFromLow
+            }).ToList();
+
+            await _cache.SetAsync(cacheKey, dtos, DefaultCacheTtl, ct);
+            return Result.Success<IReadOnlyList<Week52HighLowDto>>(dtos);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get 52-week high/low data");
+            return Result.Failure<IReadOnlyList<Week52HighLowDto>>(
+                new Error("Dashboard.Week52HighLow", ex.Message));
+        }
+    }
 }

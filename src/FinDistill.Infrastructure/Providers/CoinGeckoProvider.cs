@@ -20,7 +20,7 @@ public class CoinGeckoProvider : IMarketDataProvider
     private readonly ILogger<CoinGeckoProvider> _logger;
     private readonly CoinGeckoOptions _options;
 
-    private const string BaseUrl = "https://api.coingecko.com/api/v3";
+    private const string PublicBaseUrl = "https://api.coingecko.com/api/v3";
 
     public CoinGeckoProvider(
         HttpClient httpClient,
@@ -31,10 +31,18 @@ public class CoinGeckoProvider : IMarketDataProvider
         _logger = logger;
         _options = options.Value.CoinGecko;
 
-        // Add Demo API key header once on the shared client if configured
+        // CoinGecko requires a Demo API key for free-tier access (since 2024).
+        // Register at https://www.coingecko.com/en/api and set DataSources:CoinGecko:ApiKey.
         if (!string.IsNullOrWhiteSpace(_options.ApiKey))
         {
             _httpClient.DefaultRequestHeaders.TryAddWithoutValidation("x-cg-demo-api-key", _options.ApiKey);
+        }
+        else
+        {
+            _logger.LogWarning(
+                "CoinGecko API key is not configured. Free-tier API requires a demo key. " +
+                "Set 'DataSources:CoinGecko:ApiKey' in appsettings or environment variables. " +
+                "Get a free key at https://www.coingecko.com/en/api");
         }
     }
 
@@ -44,7 +52,7 @@ public class CoinGeckoProvider : IMarketDataProvider
     {
         var encodedCoinId = Uri.EscapeDataString(coinId);
         var vsCurrency = _options.VsCurrency;
-        var url = $"{BaseUrl}/coins/{encodedCoinId}/market_chart?vs_currency={vsCurrency}&days=5&interval=daily";
+        var url = $"{PublicBaseUrl}/coins/{encodedCoinId}/market_chart?vs_currency={vsCurrency}&days=5&interval=daily";
 
         var response = await _httpClient.GetAsync(url, ct);
         response.EnsureSuccessStatusCode();

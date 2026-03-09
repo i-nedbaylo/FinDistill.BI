@@ -96,8 +96,9 @@ public static class InfrastructureServiceExtensions
         services.AddTransient<RetryDelegatingHandler>();
 
         // API providers: register each under its concrete type for IHttpClientFactory pipeline,
-        // then add separate IMarketDataProvider registrations for IEnumerable<IMarketDataProvider> injection.
-        // Using AddHttpClient<IMarketDataProvider, T> would cause the second call to overwrite the first.
+        // then add IMarketDataProvider registrations that resolve through the factory.
+        // Using AddScoped<IMarketDataProvider, T> directly would bypass the HttpClient pipeline
+        // (RetryDelegatingHandler, default headers) because DI would inject a plain HttpClient.
         services.AddHttpClient<YahooFinanceProvider>(client =>
             {
                 client.DefaultRequestHeaders.UserAgent.ParseAdd("FinDistill.BI/1.0");
@@ -110,8 +111,11 @@ public static class InfrastructureServiceExtensions
                 client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
             })
             .AddHttpMessageHandler<RetryDelegatingHandler>();
-        services.AddScoped<IMarketDataProvider, YahooFinanceProvider>();
-        services.AddScoped<IMarketDataProvider, CoinGeckoProvider>();
+
+        // Resolve IMarketDataProvider through the concrete type so that each provider
+        // receives the HttpClient created by IHttpClientFactory (with retry handler attached).
+        services.AddScoped<IMarketDataProvider>(sp => sp.GetRequiredService<YahooFinanceProvider>());
+        services.AddScoped<IMarketDataProvider>(sp => sp.GetRequiredService<CoinGeckoProvider>());
 
         // Ticker provider (reads DataSources config)
         services.AddSingleton<ITickerProvider, ConfigTickerProvider>();
