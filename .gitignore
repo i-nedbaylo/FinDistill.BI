@@ -3,6 +3,10 @@
 ##
 ## Get latest from `dotnet new gitignore`
 
+# Copilot internal files — not published to remote
+.github/copilot-instructions.md
+.github/WORKPLAN.md
+
 # dotenv files
 .env
 

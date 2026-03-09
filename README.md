@@ -312,7 +312,9 @@ The application supports both SQL Server and PostgreSQL. All layers (EF Core, Da
 **Step 3:** Apply EF Core migrations for the chosen provider:
 
 ```bash
-dotnet ef database update --project src/FinDistill.Web
+dotnet ef database update \
+  --project src/FinDistill.Infrastructure \
+  --startup-project src/FinDistill.Web
 ```
 
 **Via environment variables:**
@@ -488,8 +490,8 @@ Replaces Dapper (SQL Server/PostgreSQL) with ClickHouse as the read engine for D
 **Step 1:** Set up a ClickHouse instance and create tables:
 
 ```bash
-# Apply the DDL script to your ClickHouse instance
-clickhouse-client --multiquery < Scripts/ClickHouse_DDL.sql
+# Apply the DDL script to your ClickHouse instance (run from the repository root)
+clickhouse-client --multiquery < src/FinDistill.Infrastructure/Scripts/ClickHouse_DDL.sql
 ```
 
 **Step 2:** Configure the connection:
@@ -526,15 +528,17 @@ ConnectionStrings__ClickHouse="Host=clickhouse-server;Port=8123;Database=default
 
 **Options class:** `FeaturesOptions` — property `UseRedis`
 
-The `ICacheService` interface and `NullCacheService` (no-op) are already implemented. Redis integration (`RedisCacheService`) is planned for Phase 10.
+> ⚠️ **Not yet active:** The `UseRedis` flag is defined but has no effect in the current implementation — `NullCacheService` is always registered regardless of this setting. Full Redis integration (`RedisCacheService`) is planned for Phase 10. The section below documents the intended behaviour once implemented.
+
+The `ICacheService` interface and `NullCacheService` (no-op) are already implemented.
 
 ```jsonc
 {
   "ConnectionStrings": {
-    "Redis": "localhost:6379"  // Required when UseRedis = true
+    "Redis": "localhost:6379"  // Will be required when UseRedis = true (Phase 10)
   },
   "Features": {
-    "UseRedis": true  // default: false
+    "UseRedis": false  // default: false — setting to true has no effect yet
   }
 }
 ```
@@ -542,7 +546,7 @@ The `ICacheService` interface and `NullCacheService` (no-op) are already impleme
 | `UseRedis` | `ICacheService` implementation | Behavior |
 |---|---|---|
 | `false` (default) | `NullCacheService` | All cache calls return `null` — transparent pass-through |
-| `true` | `RedisCacheService` (Phase 10) | Cache-aside pattern for Data Mart reads |
+| `true` *(Phase 10)* | `RedisCacheService` | Cache-aside pattern for Data Mart reads |
 
 ---
 
@@ -669,7 +673,9 @@ DataSources__CoinGecko__VsCurrency=usd
 dotnet restore
 
 # 2. Apply EF Core migrations
-dotnet ef database update --project src/FinDistill.Web
+dotnet ef database update \
+  --project src/FinDistill.Infrastructure \
+  --startup-project src/FinDistill.Web
 
 # 3. Configure CoinGecko API key (in appsettings.Development.json)
 # "DataSources": { "CoinGecko": { "ApiKey": "CG-your_key_here" } }
@@ -845,9 +851,9 @@ Render supports a single free web service with a managed PostgreSQL database (fr
 
 The `render.yaml` already includes all required environment variables with `Features__RunEtlInProcess=true`.
 
-> **Note:** Render injects `DATABASE_URL` in `postgres://user:pass@host:port/db` format. `Program.cs` automatically converts this to Npgsql connection string format.
+> **Note:** Render injects `DATABASE_URL` in `postgres://user:pass@host:port/db` format. `Program.cs` automatically converts this to an Npgsql connection string, including URL-decoding of all components.
 
-> **Note:** Render uses a dynamic `$PORT` at runtime. The Dockerfile uses a shell-form `CMD` to support this: `CMD ["sh", "-c", "dotnet FinDistill.Web.dll --urls http://+:${PORT:-8080}"]`
+> **Note:** Render uses a dynamic `$PORT` at runtime. The Dockerfile uses a shell-form `CMD` to support this: `CMD ["sh", "-c", "exec dotnet FinDistill.Web.dll --urls http://+:${PORT:-8080}"]`
 
 ### 12.3 General Production Guidelines
 
@@ -889,8 +895,7 @@ The following design decisions were made deliberately to keep the project focuse
 | Simplification | Production expectation |
 |---|---|
 | Rolling file logs only | Centralized logging (ELK, Seq, Application Insights) |
-| No health checks | `/health` endpoint with DB/API liveness probes |
-| No containerization | Dockerfile + docker-compose |
+| `/health` endpoint (liveness only) | Full `/health` + `/ready` with DB/API probes |
 | No telemetry/metrics | OpenTelemetry + Prometheus/Grafana |
 
 ### 13.4 API resilience
@@ -940,9 +945,10 @@ The following design decisions were made deliberately to keep the project focuse
 
 ### Priority 4 — Infrastructure & deployment
 
-- [ ] Dockerfile for Web and Worker services
-- [ ] `docker-compose.yml` with SQL Server, Redis, ClickHouse
+- [ ] `docker-compose.yml` with SQL Server, Redis, ClickHouse for local development
+- [x] Dockerfile for Web and Worker services
 - [x] GitHub Actions CI (build → test → publish artifacts)
+- [x] Railway.app and Render.com deployment configurations
 - [ ] Kubernetes Helm chart (optional)
 - [ ] Blue-green or canary deployment strategy
 
@@ -957,4 +963,4 @@ The following design decisions were made deliberately to keep the project focuse
 
 ---
 
-*Generated from the FinDistill.BI codebase. For architectural rules, see [`.github/copilot-instructions.md`](.github/copilot-instructions.md). For implementation progress, see [`.github/WORKPLAN.md`](.github/WORKPLAN.md).*
+*For architectural overview see sections 2–6 above. For deployment instructions see section 12.*
