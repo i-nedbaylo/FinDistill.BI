@@ -19,4 +19,8 @@
     <ProjectReference Include="..\FinDistill.Application\FinDistill.Application.csproj" />
     <ProjectReference Include="..\FinDistill.Infrastructure\FinDistill.Infrastructure.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Configuration\" />
+  </ItemGroup>
 </Project>
