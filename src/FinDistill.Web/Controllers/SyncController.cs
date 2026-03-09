@@ -17,6 +17,8 @@ public class SyncController : Controller
         _logger = logger;
     }
 
+    /// <summary>Triggers a full ETL pipeline run and redirects back to the dashboard.</summary>
+    /// <param name="ct">Cancellation token.</param>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> RunSync(CancellationToken ct)

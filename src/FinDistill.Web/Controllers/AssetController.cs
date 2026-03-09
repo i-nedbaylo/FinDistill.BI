@@ -16,6 +16,10 @@ public class AssetController : Controller
         _dashboardService = dashboardService;
     }
 
+    /// <summary>Renders the asset detail view with price chart and history table.</summary>
+    /// <param name="ticker">Asset ticker symbol or coin ID.</param>
+    /// <param name="days">Number of calendar days to display (1–365, default 30).</param>
+    /// <param name="ct">Cancellation token.</param>
     public async Task<IActionResult> Detail(string ticker, int days = 30, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(ticker))

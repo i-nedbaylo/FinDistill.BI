@@ -19,6 +19,13 @@ namespace FinDistill.Infrastructure.DependencyInjection;
 /// </summary>
 public static class InfrastructureServiceExtensions
 {
+    /// <summary>
+    /// Registers DbContext, repositories, API providers, Data Mart reader, and cache service.
+    /// Provider and feature selection are driven by <c>Database:Provider</c> and <c>Features</c> config sections.
+    /// </summary>
+    /// <param name="services">The service collection to register into.</param>
+    /// <param name="configuration">Application configuration for connection strings and options.</param>
+    /// <returns>The same <paramref name="services"/> instance for chaining.</returns>
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         // Register Dapper type handlers

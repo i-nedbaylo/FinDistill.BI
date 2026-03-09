@@ -4,6 +4,10 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace FinDistill.Infrastructure.Persistence.Configurations;
 
+/// <summary>
+/// EF Core Fluent API configuration for <see cref="DimAsset"/>.
+/// Maps to the <c>dwh.DimAssets</c> table with a unique index on <c>Ticker</c>.
+/// </summary>
 public class DimAssetConfiguration : IEntityTypeConfiguration<DimAsset>
 {
     public void Configure(EntityTypeBuilder<DimAsset> builder)

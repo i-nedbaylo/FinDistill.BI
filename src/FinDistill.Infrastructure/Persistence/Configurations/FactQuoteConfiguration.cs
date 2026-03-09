@@ -4,6 +4,11 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace FinDistill.Infrastructure.Persistence.Configurations;
 
+/// <summary>
+/// EF Core Fluent API configuration for <see cref="FactQuote"/>.
+/// Maps to the <c>dwh.FactQuotes</c> table with a composite unique constraint on
+/// <c>(AssetKey, DateKey, SourceKey)</c> and Restrict FK behaviour.
+/// </summary>
 public class FactQuoteConfiguration : IEntityTypeConfiguration<FactQuote>
 {
     public void Configure(EntityTypeBuilder<FactQuote> builder)

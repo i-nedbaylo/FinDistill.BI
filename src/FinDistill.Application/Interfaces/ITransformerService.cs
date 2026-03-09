@@ -9,5 +9,8 @@ namespace FinDistill.Application.Interfaces;
 /// </summary>
 public interface ITransformerService
 {
+    /// <summary>Transforms all unprocessed Data Lake records into validated quote DTOs.</summary>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>A <see cref="Result{T}"/> containing the list of parsed quotes, or a failure.</returns>
     Task<Result<IReadOnlyList<ParsedQuoteDto>>> TransformAsync(CancellationToken ct);
 }
