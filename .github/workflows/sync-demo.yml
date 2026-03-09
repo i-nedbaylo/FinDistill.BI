@@ -27,6 +27,11 @@ jobs:
         env:
           PUBLIC_REPO_TOKEN: ${{ secrets.PUBLIC_REPO_TOKEN }}
         run: |
+          if [ -z "${PUBLIC_REPO_TOKEN}" ]; then
+            echo "::warning::PUBLIC_REPO_TOKEN secret is not configured — skipping mirror push."
+            echo "To enable, add a PAT with 'Contents: write' scope for the target repo as a repository secret."
+            exit 0
+          fi
           git remote add public https://x-access-token:${PUBLIC_REPO_TOKEN}@github.com/i-nedbaylo/FinDistill.BI-demo.git
           # Plain --force is intentional: this is a one-way mirror workflow.
           # The concurrency group above already serializes concurrent pushes.

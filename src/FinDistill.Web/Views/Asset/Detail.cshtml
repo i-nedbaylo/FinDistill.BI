@@ -64,8 +64,11 @@ else
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"
             crossorigin="anonymous"></script>
     <script>
-        const labels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.History.Reverse().Select(h => h.Date.ToString("yyyy-MM-dd"))));
-        const closes = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.History.Reverse().Select(h => h.Close)));
+        @{
+            var chronological = Model.History.Reverse().ToList();
+        }
+        const labels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(chronological.Select(h => h.Date.ToString("yyyy-MM-dd"))));
+        const closes = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(chronological.Select(h => h.Close)));
 
         // Calculate SMA(20) — simple moving average over 20 data points
         function calcSma(data, period) {

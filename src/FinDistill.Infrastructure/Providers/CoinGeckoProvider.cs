@@ -22,6 +22,8 @@ public class CoinGeckoProvider : IMarketDataProvider
 
     private const string PublicBaseUrl = "https://api.coingecko.com/api/v3";
 
+    private static volatile bool _apiKeyWarningLogged;
+
     public CoinGeckoProvider(
         HttpClient httpClient,
         ILogger<CoinGeckoProvider> logger,
@@ -37,8 +39,9 @@ public class CoinGeckoProvider : IMarketDataProvider
         {
             _httpClient.DefaultRequestHeaders.TryAddWithoutValidation("x-cg-demo-api-key", _options.ApiKey);
         }
-        else
+        else if (!_apiKeyWarningLogged)
         {
+            _apiKeyWarningLogged = true;
             _logger.LogWarning(
                 "CoinGecko API key is not configured. Free-tier API requires a demo key. " +
                 "Set 'DataSources:CoinGecko:ApiKey' in appsettings or environment variables. " +
@@ -52,7 +55,7 @@ public class CoinGeckoProvider : IMarketDataProvider
     {
         var encodedCoinId = Uri.EscapeDataString(coinId);
         var vsCurrency = _options.VsCurrency;
-        var url = $"{PublicBaseUrl}/coins/{encodedCoinId}/market_chart?vs_currency={vsCurrency}&days=5&interval=daily";
+        var url = $"{PublicBaseUrl}/coins/{encodedCoinId}/market_chart?vs_currency={vsCurrency}&days=365&interval=daily";
 
         var response = await _httpClient.GetAsync(url, ct);
         response.EnsureSuccessStatusCode();

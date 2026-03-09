@@ -80,7 +80,11 @@ else
                         tooltip: {
                             callbacks: {
                                 label: function(context) {
-                                    return context.dataset.label + ': ' + context.parsed.y.toFixed(2);
+                                    const y = context.parsed && context.parsed.y;
+                                    if (y === null || y === undefined || Number.isNaN(y)) {
+                                        return context.dataset.label + ': N/A';
+                                    }
+                                    return context.dataset.label + ': ' + y.toFixed(2);
                                 }
                             }
                         }
