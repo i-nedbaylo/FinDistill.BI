@@ -1,7 +1,7 @@
 namespace FinDistill.Web.Models;
 
 /// <summary>
-/// View model for the error page. Populated by <see cref="HomeController.Error"/>.
+/// View model for the error page. Populated by the error action in <c>HomeController</c>.
 /// </summary>
 public class ErrorViewModel
 {

@@ -1,0 +1,45 @@
+services:
+  - type: web
+    name: findistill-web
+    runtime: docker
+    dockerfilePath: src/FinDistill.Web/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: Database__Provider
+        value: PostgreSQL
+      - key: Features__UseRedis
+        value: "false"
+      - key: Features__UseClickHouse
+        value: "false"
+      - key: Features__RunEtlInProcess
+        value: "true"
+      - key: EtlSchedule__IntervalMinutes
+        value: "15"
+      - key: DataSources__YahooFinance__Enabled
+        value: "true"
+      - key: DataSources__YahooFinance__Tickers__0
+        value: "AAPL"
+      - key: DataSources__YahooFinance__Tickers__1
+        value: "MSFT"
+      - key: DataSources__YahooFinance__Tickers__2
+        value: "SPY"
+      - key: DataSources__YahooFinance__Tickers__3
+        value: "QQQ"
+      - key: DataSources__CoinGecko__Enabled
+        value: "true"
+      - key: DataSources__CoinGecko__CoinIds__0
+        value: "bitcoin"
+      - key: DataSources__CoinGecko__CoinIds__1
+        value: "ethereum"
+      - key: DataSources__CoinGecko__VsCurrency
+        value: "usd"
+      - key: Database__AutoMigrate
+        value: "true"
+      # DATABASE_URL is set automatically by Render when PostgreSQL is linked to this service
+
+databases:
+  - name: findistill-db
+    databaseName: findistill
+    user: findistill
+    plan: free

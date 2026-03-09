@@ -1,5 +1,5 @@
+using FinDistill.Application.Configuration;
 using FinDistill.Application.Interfaces;
-using FinDistill.Worker.Configuration;
 using Microsoft.Extensions.Options;
 
 namespace FinDistill.Worker;
