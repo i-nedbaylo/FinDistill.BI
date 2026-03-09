@@ -21,6 +21,8 @@ public class YahooFinanceOptions
     public bool Enabled { get; set; } = true;
     /// <summary>List of ticker symbols to fetch (e.g. "AAPL", "SPY").</summary>
     public List<string> Tickers { get; set; } = [];
+    /// <summary>Number of calendar days of history to fetch per run. Maps to Yahoo range parameter (e.g. 5 → "5d", 365 → "1y").</summary>
+    public int HistoryDays { get; set; } = 365;
     /// <summary>Delay between individual ticker requests in milliseconds to avoid HTTP 429.</summary>
     public int RequestDelayMs { get; set; } = 2000;
 }
@@ -36,6 +38,8 @@ public class CoinGeckoOptions
     public string VsCurrency { get; set; } = "usd";
     /// <summary>Optional Demo API key (x-cg-demo-api-key). Required for free-tier access.</summary>
     public string? ApiKey { get; set; }
+    /// <summary>Number of calendar days of history to fetch per run.</summary>
+    public int HistoryDays { get; set; } = 365;
     /// <summary>Delay between individual coin requests in milliseconds to avoid HTTP 429.</summary>
     public int RequestDelayMs { get; set; } = 1500;
 }

@@ -28,14 +28,15 @@ public class LoaderServiceTests
             .ReturnsAsync((DateOnly d, CancellationToken _) => new DimDate { DateKey = d.Year * 10000 + d.Month * 100 + d.Day, FullDate = d });
         _sourceRepoMock.Setup(r => r.UpsertAsync(It.IsAny<DimSource>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((DimSource s, CancellationToken _) => new DimSource { SourceKey = 1, SourceName = s.SourceName });
+        // Default: no existing keys in DB
+        _factRepoMock.Setup(r => r.GetExistingKeysAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new HashSet<(int, int, int)>());
     }
 
     [Fact]
     public async Task LoadAsync_NewQuotes_InsertsViaAddRangeAsync()
     {
         SetupDimensions();
-        _factRepoMock.Setup(r => r.ExistsAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(false);
 
         var quotes = new List<ParsedQuoteDto>
         {
@@ -55,8 +56,9 @@ public class LoaderServiceTests
     public async Task LoadAsync_DuplicateQuotes_SkipsExisting()
     {
         SetupDimensions();
-        _factRepoMock.Setup(r => r.ExistsAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(true);
+        // Return the key as already existing in DB
+        _factRepoMock.Setup(r => r.GetExistingKeysAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new HashSet<(int, int, int)> { (1, 20240115, 1) });
 
         var quotes = new List<ParsedQuoteDto>
         {
@@ -75,8 +77,6 @@ public class LoaderServiceTests
     public async Task LoadAsync_YahooFinance_SetsAssetTypeToStock()
     {
         SetupDimensions();
-        _factRepoMock.Setup(r => r.ExistsAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(false);
 
         var quotes = new List<ParsedQuoteDto>
         {
@@ -96,8 +96,6 @@ public class LoaderServiceTests
     public async Task LoadAsync_CoinGecko_SetsAssetTypeToCrypto()
     {
         SetupDimensions();
-        _factRepoMock.Setup(r => r.ExistsAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(false);
 
         var quotes = new List<ParsedQuoteDto>
         {
@@ -117,8 +115,6 @@ public class LoaderServiceTests
     public async Task LoadAsync_SameTickerMultipleDates_CachesDimensionLookup()
     {
         SetupDimensions();
-        _factRepoMock.Setup(r => r.ExistsAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(false);
 
         var quotes = new List<ParsedQuoteDto>
         {
@@ -131,12 +127,13 @@ public class LoaderServiceTests
         var result = await sut.LoadAsync(quotes, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        // Asset UpsertAsync called only once (cached for subsequent calls)
+        // Asset and Source UpsertAsync called only once each (pre-resolved and cached)
         _assetRepoMock.Verify(r => r.UpsertAsync(It.IsAny<DimAsset>(), It.IsAny<CancellationToken>()), Times.Once);
-        // Source UpsertAsync called only once (same SourceType)
         _sourceRepoMock.Verify(r => r.UpsertAsync(It.IsAny<DimSource>(), It.IsAny<CancellationToken>()), Times.Once);
         // Date called 3 times (different dates)
         _dateRepoMock.Verify(r => r.EnsureDateExistsAsync(It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()), Times.Exactly(3));
+        // GetExistingKeysAsync called once (one asset/source pair)
+        _factRepoMock.Verify(r => r.GetExistingKeysAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
         // All 3 facts in one batch
         _factRepoMock.Verify(r => r.AddRangeAsync(
             It.Is<IEnumerable<FactQuote>>(q => q.Count() == 3),
@@ -158,8 +155,6 @@ public class LoaderServiceTests
     public async Task LoadAsync_IntraBatchDuplicates_InsertsOnlyFirst()
     {
         SetupDimensions();
-        _factRepoMock.Setup(r => r.ExistsAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(false);
 
         // Two quotes with same (Ticker, Date, SourceType) in one batch
         var quotes = new List<ParsedQuoteDto>
@@ -172,13 +167,17 @@ public class LoaderServiceTests
         var result = await sut.LoadAsync(quotes, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        // Only one fact inserted despite two input quotes
+        // Only one fact inserted despite two input quotes with the same key
         _factRepoMock.Verify(r => r.AddRangeAsync(
             It.Is<IEnumerable<FactQuote>>(q => q.Count() == 1),
             It.IsAny<CancellationToken>()), Times.Once);
-        // ExistsAsync called only once (second quote skipped by batchKeys before DB check)
+        // GetExistingKeysAsync called once (bulk check), not per row
+        _factRepoMock.Verify(r => r.GetExistingKeysAsync(
+            It.IsAny<int>(), It.IsAny<int>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+        // ExistsAsync never called (replaced by bulk check)
         _factRepoMock.Verify(r => r.ExistsAsync(
             It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int>(),
-            It.IsAny<CancellationToken>()), Times.Once);
+            It.IsAny<CancellationToken>()), Times.Never);
     }
 }

@@ -46,8 +46,47 @@ public class LoaderService : ILoaderService
             var dateCache = new Dictionary<DateOnly, DimDate>();
             var sourceCache = new Dictionary<DataSourceType, DimSource>();
 
+            // Pre-resolve all unique dimensions first so we can bulk-fetch existing keys
+            foreach (var dto in quoteList)
+            {
+                if (!assetCache.ContainsKey(dto.Ticker))
+                {
+                    assetCache[dto.Ticker] = await _assetRepo.UpsertAsync(new DimAsset
+                    {
+                        Ticker = dto.Ticker,
+                        Name = dto.Ticker,
+                        AssetType = ResolveAssetType(dto.SourceType),
+                        IsActive = true,
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    }, ct);
+                }
+
+                if (!sourceCache.ContainsKey(dto.SourceType))
+                {
+                    sourceCache[dto.SourceType] = await _sourceRepo.UpsertAsync(new DimSource
+                    {
+                        SourceName = dto.SourceType.ToString(),
+                        BaseUrl = string.Empty,
+                        IsActive = true
+                    }, ct);
+                }
+            }
+
+            // Bulk-fetch existing (AssetKey, DateKey, SourceKey) keys per (asset, source) pair —
+            // one query per pair instead of one query per quote row.
+            var existingKeys = new HashSet<(int, int, int)>();
+            foreach (var (assetKey, asset) in assetCache.Select(kv => (kv.Value.AssetKey, kv.Value)))
+            {
+                foreach (var source in sourceCache.Values)
+                {
+                    var keys = await _factRepo.GetExistingKeysAsync(asset.AssetKey, source.SourceKey, ct);
+                    existingKeys.UnionWith(keys);
+                }
+            }
+
             var factsToInsert = new List<FactQuote>();
-            // Track (AssetKey, DateKey, SourceKey) within the current batch to prevent intra-batch duplicates
+            // Track new keys added in this batch to prevent intra-batch duplicates
             var batchKeys = new HashSet<(int AssetKey, int DateKey, int SourceKey)>();
             var skipped = 0;
 
@@ -55,51 +94,20 @@ public class LoaderService : ILoaderService
             {
                 try
                 {
-                    // Resolve asset (cached)
-                    if (!assetCache.TryGetValue(dto.Ticker, out var asset))
-                    {
-                        asset = await _assetRepo.UpsertAsync(new DimAsset
-                        {
-                            Ticker = dto.Ticker,
-                            Name = dto.Ticker,
-                            AssetType = ResolveAssetType(dto.SourceType),
-                            IsActive = true,
-                            CreatedAt = DateTime.UtcNow,
-                            UpdatedAt = DateTime.UtcNow
-                        }, ct);
-                        assetCache[dto.Ticker] = asset;
-                    }
+                    var asset = assetCache[dto.Ticker];
+                    var source = sourceCache[dto.SourceType];
 
-                    // Resolve date (cached)
+                    // Resolve date (cached per batch)
                     if (!dateCache.TryGetValue(dto.Date, out var dimDate))
                     {
                         dimDate = await _dateRepo.EnsureDateExistsAsync(dto.Date, ct);
                         dateCache[dto.Date] = dimDate;
                     }
 
-                    // Resolve source (cached)
-                    if (!sourceCache.TryGetValue(dto.SourceType, out var source))
-                    {
-                        source = await _sourceRepo.UpsertAsync(new DimSource
-                        {
-                            SourceName = dto.SourceType.ToString(),
-                            BaseUrl = string.Empty,
-                            IsActive = true
-                        }, ct);
-                        sourceCache[dto.SourceType] = source;
-                    }
-
                     var key = (asset.AssetKey, dimDate.DateKey, source.SourceKey);
 
-                    // Skip if already in current batch (intra-batch dedup)
-                    if (!batchKeys.Add(key))
-                    {
-                        skipped++;
-                        continue;
-                    }
-
-                    // Skip if this fact already exists in DB
-                    if (await _factRepo.ExistsAsync(asset.AssetKey, dimDate.DateKey, source.SourceKey, ct))
+                    // Skip if already in current batch or already in DB
+                    if (!batchKeys.Add(key) || existingKeys.Contains(key))
                     {
                         skipped++;
                         continue;
